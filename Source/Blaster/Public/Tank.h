@@ -10,7 +10,7 @@ class UParticleSystem;
 class USpringArmComponent;
 class UCameraComponent;
 class UHealthComponent;
-class UUserWidget;
+class UMainUIWidget;
 UCLASS(Abstract)
 class BLASTER_API ATank : public ACharacter, public IInputable
 {
@@ -27,8 +27,6 @@ public:
    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tank|Weapons",
        meta = (ClampMin = "0.05"))
    float FireRateSeconds = 0.5f;
-   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|UI")
-   TSubclassOf<UUserWidget> TankHUDClass;
    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Respawn",
        meta = (ClampMin = "0.1"))
    float RespawnTime = 3.0f;
@@ -72,9 +70,12 @@ protected:
    TSubclassOf<AActor> ProjectileClass;
    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Weapons")
    TObjectPtr<UParticleSystem> ShotCaseEffect;
+   // Widget class loaded from WBP_MainUI.
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|UI")
+   TSubclassOf<UMainUIWidget> TankHUDClass;
 private:
    UPROPERTY(Transient)
-   TObjectPtr<UUserWidget> TankHUD;
+   TObjectPtr<UMainUIWidget> TankHUD;
    FTransform RespawnTransform;
    FTimerHandle FireRateTimerHandle;
    FTimerHandle RespawnTimerHandle;
