@@ -1,38 +1,49 @@
-﻿#pragma once
+#pragma once
+
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "HealthComponent.generated.h"
-// Delegate Declarations[span_0](start_span)[span_0](end_span)[span_1](start_span)[span_1](end_span)
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FHealthModifiedSignature, bool, bPositive, float, newHealth, float, healthDelta, float, healthRatio);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FHealthModifiedSignature, bool, bPositive, float, NewHealth, float, HealthDelta, float, HealthRatio);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FDeathSignature);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FDeathContextSignature, AController*, InstigatedBy, AActor*, DamageCauser);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FTargetDestroyedSignature);
+
+/** Native implementation of the project's health and target-destruction component behaviour. */
 UCLASS(Blueprintable, ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class BLASTER_API UHealthComponent : public UActorComponent
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 public:
-	UHealthComponent();
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool bIsDead = false;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float CurrentHealth = 0.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
-	float MaxHealth = 50.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health")
-	bool bIsInvulnerable = false;
-	// Delegate Properties[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span)
-	UPROPERTY(BlueprintCallable, BlueprintAssignable)
-	FHealthModifiedSignature OnHealthModified;
-	UPROPERTY(BlueprintCallable, BlueprintAssignable)
-	FDeathSignature OnDeath;
-	// Functions[span_4](start_span)[span_4](end_span)
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	float GetCurrentHealth();
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void CheckDeath(AController* instigator, AActor* causer);
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
-	void ApplyDamage(AActor* DamagedActor, float Damage, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
-	UFUNCTION(BlueprintCallable, Category = "Health")
-	void ResetHealth();
+    UHealthComponent();
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Health") bool bIsDead = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Health") float CurrentHealth = 0.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Health") float MaxHealth = 50.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Health") bool bIsInvulnerable = false;
+
+    // Original Blueprint dispatcher name and signature.
+    UPROPERTY(BlueprintAssignable, Category="Health") FHealthModifiedSignature EHealthModified;
+    // Compatibility dispatcher used by existing native Tank code.
+    UPROPERTY(BlueprintAssignable, Category="Health") FHealthModifiedSignature OnHealthModified;
+    // Kept parameterless for existing native consumers such as ATank.
+    UPROPERTY(BlueprintAssignable, Category="Health") FDeathSignature OnDeath;
+    // Matches the original Blueprint EDeath(Controller, Actor) dispatcher.
+    UPROPERTY(BlueprintAssignable, Category="Health") FDeathContextSignature EDeath;
+    UPROPERTY(BlueprintAssignable, Category="Target") FTargetDestroyedSignature ETargetDestroyed;
+
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Health") float GetCurrentHealth();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Health") void CheckDeath(AController* InstigatedBy, AActor* DamageCauser);
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Health") void ApplyDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser);
+    UFUNCTION(BlueprintCallable, Category="Health") void ResetHealth();
+    UFUNCTION(BlueprintPure, Category="Health") bool IsDead() const { return bIsDead; }
+
+    /** Target component equivalents: bind owner destruction and activate the target. */
+    UFUNCTION(BlueprintCallable, Category="Target") void ActivateTarget();
+
 protected:
-	virtual void BeginPlay() override;
+    virtual void BeginPlay() override;
+
+private:
+    UFUNCTION() void HandleOwnerDestroyed(AActor* DestroyedActor);
 };

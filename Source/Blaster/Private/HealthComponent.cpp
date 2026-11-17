@@ -1,45 +1,78 @@
-﻿#include "HealthComponent.h"
+#include "HealthComponent.h"
+#include "GameFramework/Actor.h"
+
 UHealthComponent::UHealthComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+    PrimaryComponentTick.bCanEverTick = false;
 }
+
 void UHealthComponent::BeginPlay()
 {
-	Super::BeginPlay();
-	// Bind to the engine's built-in damage event[span_5](start_span)[span_5](end_span)
-	GetOwner()->OnTakeAnyDamage.AddUniqueDynamic(this, &UHealthComponent::ApplyDamage);
+    Super::BeginPlay();
+    if (AActor* Owner = GetOwner())
+    {
+        Owner->OnTakeAnyDamage.AddUniqueDynamic(this, &UHealthComponent::ApplyDamage);
+        Owner->OnDestroyed.AddUniqueDynamic(this, &UHealthComponent::HandleOwnerDestroyed);
+    }
+    if (CurrentHealth <= 0.0f && !bIsDead)
+    {
+        ResetHealth();
+    }
 }
+
 float UHealthComponent::GetCurrentHealth_Implementation()
 {
-	return CurrentHealth;
+    return CurrentHealth;
 }
-void UHealthComponent::ApplyDamage_Implementation(AActor* DamagedActor, float Damage, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser)
+
+void UHealthComponent::ApplyDamage_Implementation(AActor* DamagedActor, float Damage, const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser)
 {
-	// C++ logic matching the old Blueprint graph[span_6](start_span)[span_6](end_span)
-	if (bIsDead || bIsInvulnerable)
-	{
-		return;
-	}
-	else
-	{
-		CurrentHealth = FMath::Clamp(CurrentHealth - Damage, 0.0f, MaxHealth);
-		OnHealthModified.Broadcast(CurrentHealth > 0.0f, CurrentHealth, Damage, CurrentHealth / MaxHealth);
-		CheckDeath(InstigatedBy, DamageCauser);
-	}
+    // Exact Blueprint flow: return only when dead or invulnerable.
+    // Negative damage is allowed and therefore restores health through Clamp.
+    if (bIsDead || bIsInvulnerable)
+    {
+        return;
+    }
+
+    CurrentHealth = FMath::Clamp(CurrentHealth - Damage, 0.0f, MaxHealth);
+    const bool bPositive = Damage > 0.0f;
+    const float HealthRatio = MaxHealth > 0.0f ? CurrentHealth / MaxHealth : 0.0f;
+
+    // Broadcast the original Blueprint dispatcher and the native compatibility
+    // dispatcher so existing widgets and Tank.cpp listeners both continue working.
+    EHealthModified.Broadcast(bPositive, CurrentHealth, Damage, HealthRatio);
+    OnHealthModified.Broadcast(bPositive, CurrentHealth, Damage, HealthRatio);
+    CheckDeath(InstigatedBy, DamageCauser);
 }
-void UHealthComponent::CheckDeath_Implementation(AController* instigator, AActor* causer)
+
+void UHealthComponent::CheckDeath_Implementation(AController* InstigatedBy, AActor* DamageCauser)
 {
-	if (CurrentHealth <= 0.0f)
-	{
-		bIsDead = true;
-		OnDeath.Broadcast(); // Trigger the C++ Death delegate[span_7](start_span)[span_7](end_span)
-	}
-	
+    if (!bIsDead && CurrentHealth <= 0.0f)
+    {
+        bIsDead = true;
+        EDeath.Broadcast(InstigatedBy, DamageCauser);
+        OnDeath.Broadcast();
+    }
 }
+
 void UHealthComponent::ResetHealth()
 {
-	CurrentHealth = MaxHealth;
-	bIsDead = false;
-	bIsInvulnerable = false;
-	OnHealthModified.Broadcast(true, CurrentHealth, 0.0f, 1.0f);
+    MaxHealth = FMath::Max(0.0f, MaxHealth);
+    CurrentHealth = MaxHealth;
+    bIsDead = false;
+    bIsInvulnerable = false;
+    const float HealthRatio = MaxHealth > 0.0f ? CurrentHealth / MaxHealth : 0.0f;
+    EHealthModified.Broadcast(false, CurrentHealth, 0.0f, HealthRatio);
+    OnHealthModified.Broadcast(false, CurrentHealth, 0.0f, HealthRatio);
+}
+
+void UHealthComponent::ActivateTarget()
+{
+    // The original BPC_TargetComponent's ActivateTarget graph has no actions;
+    // the event is intentionally retained for Blueprint/API compatibility.
+}
+
+void UHealthComponent::HandleOwnerDestroyed(AActor* DestroyedActor)
+{
+    ETargetDestroyed.Broadcast();
 }

@@ -5,6 +5,7 @@
 #include "BaseEnemyTurret.generated.h"
 
 class ATank;
+class UHealthComponent;
 class AController;
 class UActorComponent;
 class USceneComponent;
@@ -47,6 +48,10 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<UActorComponent> CachedHealthActorComponent;
 
+    // Native health component: replaces the Blueprint BPC_HealthComponent.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Health", meta=(AllowPrivateAccess="true"))
+    TObjectPtr<UHealthComponent> NativeHealthComponent;
+
     UPROPERTY(Transient)
     TObjectPtr<ATank> CachedTank;
 
@@ -54,6 +59,7 @@ private:
 
     void CacheBlueprintComponents();
     void InitialiseBlueprintHealthComponent();
+    void InitialiseNativeHealthComponent();
     void FindPlayerTank();
     void UpdateTurretAim();
     void FireCheck();

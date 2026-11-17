@@ -1,6 +1,7 @@
 #include "BaseEnemyTurret.h"
 
 #include "Tank.h"
+#include "HealthComponent.h"
 
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
@@ -20,6 +21,7 @@ ABaseEnemyTurret::ABaseEnemyTurret()
 {
     PrimaryActorTick.bCanEverTick = true;
     SetCanBeDamaged(true);
+    NativeHealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("NativeHealthComponent"));
 
     // This is the effect referenced by the original BP_BaseEnemyTurret asset.
     static ConstructorHelpers::FObjectFinder<UParticleSystem> DeathEffectAsset(
@@ -57,7 +59,7 @@ void ABaseEnemyTurret::BeginPlay()
 
     SetCanBeDamaged(true);
     CacheBlueprintComponents();
-    InitialiseBlueprintHealthComponent();
+    InitialiseNativeHealthComponent();
     FindPlayerTank();
 
     // BP_BaseEnemyTurret originally waited a random 0.0-0.9 seconds,
@@ -144,12 +146,29 @@ void ABaseEnemyTurret::CacheBlueprintComponents()
             *GetName());
     }
 
-    if (!CachedHealthActorComponent)
+    // The native component is created in the C++ constructor. The legacy
+    // Blueprint component is optional and is no longer required for damage.
+}
+
+void ABaseEnemyTurret::InitialiseNativeHealthComponent()
+{
+    if (!IsValid(NativeHealthComponent))
     {
-        UE_LOG(LogTemp, Error,
-            TEXT("%s: Could not find the Blueprint HealthComponent."),
-            *GetName());
+        UE_LOG(LogTemp, Error, TEXT("%s: NativeHealthComponent is missing."), *GetName());
+        return;
     }
+
+    // Keep the existing BP_BaseEnemyTurret MaxHP value as the tuning source,
+    // but all damage/death behaviour now lives in UHealthComponent.
+    const float ConfiguredMaxHP = FMath::Max(1.0f, ReadBlueprintFloat(FName(TEXT("MaxHP")), 50.0f));
+    NativeHealthComponent->MaxHealth = ConfiguredMaxHP;
+    NativeHealthComponent->ResetHealth();
+    // EDeath is the canonical original Blueprint event. OnDeath remains
+    // available for existing native consumers, but binding both here would
+    // spawn the enemy death effect twice.
+    NativeHealthComponent->EDeath.AddUniqueDynamic(this, &ABaseEnemyTurret::HandleHealthDeathWithContext);
+
+    UE_LOG(LogTemp, Log, TEXT("%s: Native health ready. MaxHealth=%.1f"), *GetName(), ConfiguredMaxHP);
 }
 
 void ABaseEnemyTurret::InitialiseBlueprintHealthComponent()
