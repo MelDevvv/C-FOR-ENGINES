@@ -1,4 +1,3 @@
-﻿
 #pragma once
 
 #include "CoreMinimal.h"
@@ -7,51 +6,61 @@
 #include "TankedGameModeBase.generated.h"
 
 class UBaseGameRule;
+class UObjectiveUIWidget;
 
 UCLASS(Abstract, Blueprintable)
 class BLASTER_API ATankedGameModeBase : public AGameModeBase
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rules")
-	TArray<TObjectPtr<UBaseGameRule>> ActiveRules;
+    ATankedGameModeBase();
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rules")
-	TSubclassOf<UBaseGameRule> TimerRuleClass;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Rules")
+    TArray<TObjectPtr<UBaseGameRule>> ActiveRules;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rules")
-	TSubclassOf<UBaseGameRule> EndReachedRuleClass;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rules")
+    TSubclassOf<UBaseGameRule> TimerRuleClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rules")
-	TSubclassOf<UBaseGameRule> EncounterRuleClass;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rules")
+    TSubclassOf<UBaseGameRule> EndReachedRuleClass;
 
-	virtual void BeginPlay() override;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Rules")
+    TSubclassOf<UBaseGameRule> EncounterRuleClass;
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Rules")
-	void OnRuleCompleted(int32 RuleID, bool bSuccessful);
+    virtual void BeginPlay() override;
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Rules")
-	void EndGame();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Rules")
+    void OnRuleCompleted(int32 RuleID, bool bSuccessful);
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Rules")
-	void RegisterGameRules();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Rules")
+    void EndGame();
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Rules")
-	bool CheckRules(int32 RuleID, bool bSuccessful);
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Rules")
+    void RegisterGameRules();
 
-	UFUNCTION(BlueprintNativeEvent, Category = "Rules")
-	void CreateUIElementsForRules();
+    UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Rules")
+    bool CheckRules(int32 RuleID, bool bSuccessful);
 
-	UFUNCTION(BlueprintNativeEvent, Category = "Rules")
-	void OnEndTimerComplete();
+    UFUNCTION(BlueprintNativeEvent, Category = "Rules")
+    void CreateUIElementsForRules();
+
+    UFUNCTION(BlueprintNativeEvent, Category = "Rules")
+    void OnEndTimerComplete();
 
 private:
-	UPROPERTY(Transient)
-	TArray<TObjectPtr<UBaseGameRule>> CreatedRules;
+    UPROPERTY(Transient)
+    TArray<TObjectPtr<UBaseGameRule>> CreatedRules;
 
-	FTimerHandle EndGameTimerHandle;
+    /** Native class reference to /Game/Scripts/UI/WBP_ObjectiveUI. */
+    UPROPERTY(Transient)
+    TSubclassOf<UObjectiveUIWidget> ObjectiveUIWidgetClass;
 
-	UBaseGameRule* CreateRule(
-		TSubclassOf<UBaseGameRule> RuleClass);
+    /** Prevents creating a second objective panel if UI creation is requested again. */
+    UPROPERTY(Transient)
+    TObjectPtr<UObjectiveUIWidget> ObjectiveUIWidgetInstance = nullptr;
+
+    FTimerHandle EndGameTimerHandle;
+
+    UBaseGameRule* CreateRule(TSubclassOf<UBaseGameRule> RuleClass);
 };

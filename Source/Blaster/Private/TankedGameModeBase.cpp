@@ -1,8 +1,32 @@
-﻿
 #include "TankedGameModeBase.h"
+
 #include "BaseGameRule.h"
-#include "Kismet/GameplayStatics.h"
+#include "ObjectiveUIWidget.h"
+
+#include "Blueprint/UserWidget.h"
+#include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
+#include "UObject/ConstructorHelpers.h"
+
+ATankedGameModeBase::ATankedGameModeBase()
+{
+    static ConstructorHelpers::FClassFinder<UObjectiveUIWidget> ObjectiveWidgetFinder(
+        TEXT("/Game/Scripts/UI/WBP_ObjectiveUI"));
+
+    if (ObjectiveWidgetFinder.Succeeded())
+    {
+        ObjectiveUIWidgetClass = ObjectiveWidgetFinder.Class;
+    }
+    else
+    {
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT("TankedGameModeBase: Could not find /Game/Scripts/UI/WBP_ObjectiveUI. "
+                 "Check that WBP_ObjectiveUI inherits from ObjectiveUIWidget."));
+    }
+}
 
 void ATankedGameModeBase::BeginPlay()
 {
@@ -24,8 +48,7 @@ void ATankedGameModeBase::BeginPlay()
 
         Rule->OnRuleComplete.AddUniqueDynamic(
             this,
-            &ATankedGameModeBase::OnRuleCompleted
-        );
+            &ATankedGameModeBase::OnRuleCompleted);
 
         Rule->InitRule(Index);
 
@@ -34,8 +57,7 @@ void ATankedGameModeBase::BeginPlay()
             Warning,
             TEXT("Initialised rule %d: %s"),
             Index,
-            *Rule->GetClass()->GetName()
-        );
+            *Rule->GetClass()->GetName());
     }
 
     CreateUIElementsForRules();
@@ -49,9 +71,7 @@ UBaseGameRule* ATankedGameModeBase::CreateRule(
         UE_LOG(
             LogTemp,
             Error,
-            TEXT("A rule class is missing in GameMode Class Defaults.")
-        );
-
+            TEXT("A rule class is missing in GameMode Class Defaults."));
         return nullptr;
     }
 
@@ -92,8 +112,7 @@ void ATankedGameModeBase::RegisterGameRules_Implementation()
         LogTemp,
         Warning,
         TEXT("Registered %d game rules."),
-        ActiveRules.Num()
-    );
+        ActiveRules.Num());
 }
 
 void ATankedGameModeBase::OnRuleCompleted_Implementation(
@@ -105,18 +124,12 @@ void ATankedGameModeBase::OnRuleCompleted_Implementation(
         Warning,
         TEXT("RULE COMPLETED: ID=%d, Success=%s"),
         RuleID,
-        bSuccessful ? TEXT("TRUE") : TEXT("FALSE")
-    );
+        bSuccessful ? TEXT("TRUE") : TEXT("FALSE"));
 
     // Rule 0 is the timer. Failure means time has run out.
     if (RuleID == 0 && !bSuccessful)
     {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("TIMER EXPIRED - RESTARTING LEVEL")
-        );
-
+        UE_LOG(LogTemp, Warning, TEXT("TIMER EXPIRED - RESTARTING LEVEL"));
         EndGame();
         return;
     }
@@ -124,12 +137,7 @@ void ATankedGameModeBase::OnRuleCompleted_Implementation(
     // Rule 1 is the exit. Success means the player reached the exit.
     if (RuleID == 1 && bSuccessful)
     {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("EXIT REACHED - RESTARTING LEVEL")
-        );
-
+        UE_LOG(LogTemp, Warning, TEXT("EXIT REACHED - RESTARTING LEVEL"));
         EndGame();
         return;
     }
@@ -137,11 +145,7 @@ void ATankedGameModeBase::OnRuleCompleted_Implementation(
     // Encounter completion does not restart the level.
     if (RuleID == 2 && bSuccessful)
     {
-        UE_LOG(
-            LogTemp,
-            Warning,
-            TEXT("ENCOUNTER RULE COMPLETED")
-        );
+        UE_LOG(LogTemp, Warning, TEXT("ENCOUNTER RULE COMPLETED"));
     }
 }
 
@@ -152,7 +156,6 @@ void ATankedGameModeBase::EndGame_Implementation()
         return;
     }
 
-    // Avoid scheduling multiple restarts.
     if (GetWorld()->GetTimerManager().IsTimerActive(EndGameTimerHandle))
     {
         return;
@@ -163,8 +166,7 @@ void ATankedGameModeBase::EndGame_Implementation()
         this,
         &ATankedGameModeBase::OnEndTimerComplete,
         1.0f,
-        false
-    );
+        false);
 }
 
 bool ATankedGameModeBase::CheckRules_Implementation(
@@ -194,7 +196,58 @@ bool ATankedGameModeBase::CheckRules_Implementation(
 
 void ATankedGameModeBase::CreateUIElementsForRules_Implementation()
 {
-    // The Blueprint child creates and displays the objective UI.
+    if (IsValid(ObjectiveUIWidgetInstance))
+    {
+        // Already on screen; do not duplicate the objective panel.
+        if (!ObjectiveUIWidgetInstance->IsInViewport())
+        {
+            ObjectiveUIWidgetInstance->AddToViewport(0);
+        }
+        return;
+    }
+
+    if (!ObjectiveUIWidgetClass)
+    {
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT("Cannot create objective UI: ObjectiveUIWidgetClass is null. "
+                 "Ensure WBP_ObjectiveUI is a child of ObjectiveUIWidget."));
+        return;
+    }
+
+    UObjectiveUIWidget* ObjectiveWidget =
+        CreateWidget<UObjectiveUIWidget>(GetWorld(), ObjectiveUIWidgetClass);
+
+    if (!IsValid(ObjectiveWidget))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Failed to create WBP_ObjectiveUI."));
+        return;
+    }
+
+    // The original Blueprint function pin is a generic Object Array.
+    // Convert ActiveRules to that exact input type before calling InitRulesCPP.
+    TArray<UObject*> RuleObjects;
+    RuleObjects.Reserve(ActiveRules.Num());
+
+    for (const TObjectPtr<UBaseGameRule>& Rule : ActiveRules)
+    {
+        if (IsValid(Rule.Get()))
+        {
+            RuleObjects.Add(Rule.Get());
+        }
+    }
+
+    ObjectiveWidget->InitRulesCPP(RuleObjects);
+    ObjectiveWidget->AddToViewport(0);
+
+    ObjectiveUIWidgetInstance = ObjectiveWidget;
+
+    UE_LOG(
+        LogTemp,
+        Log,
+        TEXT("Created WBP_ObjectiveUI and added %d rules to the viewport."),
+        RuleObjects.Num());
 }
 
 void ATankedGameModeBase::OnEndTimerComplete_Implementation()
@@ -207,18 +260,10 @@ void ATankedGameModeBase::OnEndTimerComplete_Implementation()
         UE_LOG(
             LogTemp,
             Error,
-            TEXT("Cannot restart: current level name is empty.")
-        );
-
+            TEXT("Cannot restart: current level name is empty."));
         return;
     }
 
-    UE_LOG(
-        LogTemp,
-        Warning,
-        TEXT("Restarting level: %s"),
-        *CurrentLevel
-    );
-
+    UE_LOG(LogTemp, Warning, TEXT("Restarting level: %s"), *CurrentLevel);
     UGameplayStatics::OpenLevel(this, FName(*CurrentLevel));
 }
