@@ -58,13 +58,49 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<UParticleSystem> MachineGunMissEffect;
 
+    UPROPERTY(Transient)
+    TObjectPtr<UParticleSystemComponent> CachedLightningCharge;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UParticleSystemComponent> CachedLightningCharge1;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UParticleSystem> LightningBlastEffect;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UParticleSystem> LightningHitEffect;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UArrowComponent> CachedRocketArrow0;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UArrowComponent> CachedRocketArrow1;
+
+    UPROPERTY(Transient)
+    TObjectPtr<USceneComponent> CachedRocketMesh0;
+
+    UPROPERTY(Transient)
+    TObjectPtr<USceneComponent> CachedRocketMesh1;
+
+    UPROPERTY(Transient)
+    TSubclassOf<AActor> RocketProjectileClass;
+
+    float RocketShakeElapsed = 0.0f;
+    bool bRocketShakeActive = false;
+
+    float LightningAttackElapsed = 0.0f;
+    bool bLightningAttackActive = false;
+    FVector LightningTurretBaseRelativeLocation = FVector::ZeroVector;
+    FRotator LightningTurretBaseRelativeRotation = FRotator::ZeroRotator;
+    bool bHasLightningTurretBaseTransform = false;
+
     float MachineGunShakeElapsed = 0.0f;
     bool bMachineGunShakeActive = false;
     FVector MachineGunTurretSpinBaseRelativeLocation = FVector::ZeroVector;
     bool bHasMachineGunTurretSpinBaseLocation = false;
 
     UPROPERTY(Transient)
-    TObjectPtr<ATank> CachedTank;
+    TObjectPtr<AActor> CachedTank;
 
     FTimerHandle FireTimerHandle;
 
@@ -76,9 +112,18 @@ private:
     void ExecuteChildTurretFire();
     void UpdateNativeMachineGunShake(float DeltaTime);
     void ExecuteNativeMachineGunFire();
+    void ExecuteNativeLightningFire();
+    void UpdateNativeLightningAttack(float DeltaTime);
+    void CacheRocketComponents();
+    void ExecuteNativeRocketFire();
+    void UpdateNativeRocketShake(float DeltaTime);
+
+    bool ReadBlueprintBool(FName VariableName, bool DefaultValue) const;
+    void WriteBlueprintBool(FName VariableName, bool Value);
 
     float ReadBlueprintFloat(FName VariableName, float DefaultValue) const;
     void WriteBlueprintFloat(FName VariableName, float Value);
+    UObject* ReadBlueprintObject(FName VariableName) const;
     void WriteBlueprintObject(FName VariableName, UObject* Value);
 
     UFUNCTION()

@@ -3,15 +3,19 @@
 #include "Tank.h"
 #include "HealthComponent.h"
 #include "Components/ArrowComponent.h"
+#include "Engine/StaticMeshActor.h"
 #include "Particles/ParticleSystemComponent.h"
 
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/PrimitiveComponent.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 #include "CollisionShape.h"
 #include "CollisionQueryParams.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "Particles/ParticleSystem.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -47,6 +51,27 @@ ABaseEnemyTurret::ABaseEnemyTurret()
     if (MachineGunMissAsset.Succeeded())
     {
         MachineGunMissEffect = MachineGunMissAsset.Object;
+    }
+
+    static ConstructorHelpers::FObjectFinder<UParticleSystem> LightningBlastAsset(
+        TEXT("/Game/Assets/Effects/PS_LightingBlast.PS_LightingBlast"));
+    if (LightningBlastAsset.Succeeded())
+    {
+        LightningBlastEffect = LightningBlastAsset.Object;
+    }
+
+    static ConstructorHelpers::FObjectFinder<UParticleSystem> LightningHitAsset(
+        TEXT("/Game/Assets/Effects/PS_LightningHit.PS_LightningHit"));
+    if (LightningHitAsset.Succeeded())
+    {
+        LightningHitEffect = LightningHitAsset.Object;
+    }
+
+    static ConstructorHelpers::FClassFinder<AActor> RocketClassAsset(
+        TEXT("/Game/Scripts/Gameplay/Weapons/BP_Rocket"));
+    if (RocketClassAsset.Succeeded())
+    {
+        RocketProjectileClass = RocketClassAsset.Class;
     }
 }
 
@@ -105,8 +130,17 @@ void ABaseEnemyTurret::Tick(float DeltaTime)
         FindPlayerTank();
     }
 
-    UpdateTurretAim();
+    // Run recoil/timeline transforms first. RocketShake writes the TurretSpin
+    // relative rotation each frame; if aim runs before it, that write can
+    // overwrite the freshly calculated target rotation.
     UpdateNativeMachineGunShake(DeltaTime);
+    UpdateNativeLightningAttack(DeltaTime);
+    UpdateNativeRocketShake(DeltaTime);
+
+    // Aim last so the final transform for this frame always faces the player.
+    // The child Arrow/Arrow1 launch points inherit this rotation, so rockets
+    // use the same yaw direction as the turret.
+    UpdateTurretAim();
 }
 
 void ABaseEnemyTurret::CacheBlueprintComponents()
@@ -154,6 +188,27 @@ void ABaseEnemyTurret::CacheBlueprintComponents()
             *GetName());
     }
 
+    // Preserve and locate the two authored charge particle components from
+    // BP_Enemy_Lightning. They remain Blueprint-owned; C++ only drives params.
+    TArray<UParticleSystemComponent*> ParticleComponents;
+    GetComponents<UParticleSystemComponent>(ParticleComponents);
+    for (UParticleSystemComponent* ParticleComponent : ParticleComponents)
+    {
+        if (!IsValid(ParticleComponent))
+        {
+            continue;
+        }
+        const FName ComponentName = ParticleComponent->GetFName();
+        if (ComponentName == FName(TEXT("LightingCharge")))
+        {
+            CachedLightningCharge = ParticleComponent;
+        }
+        else if (ComponentName == FName(TEXT("LightingCharge1")))
+        {
+            CachedLightningCharge1 = ParticleComponent;
+        }
+    }
+
     // The native component is created in the C++ constructor. The legacy
     // Blueprint component is optional and is no longer required for damage.
 }
@@ -181,68 +236,80 @@ void ABaseEnemyTurret::InitialiseNativeHealthComponent()
 
 void ABaseEnemyTurret::FindPlayerTank()
 {
-    ATank* FoundTank = Cast<ATank>(
-        UGameplayStatics::GetPlayerCharacter(this, 0)
-    );
+    AActor* FoundTarget = nullptr;
 
-    // Match the original Blueprint's GetAllActorsOfClass fallback.
-    if (!IsValid(FoundTank) && GetWorld())
+    // Prefer a valid TankREF assigned by the existing Blueprint/gameplay.
+    if (UObject* ExistingReference = ReadBlueprintObject(FName(TEXT("TankREF"))))
+    {
+        FoundTarget = Cast<AActor>(ExistingReference);
+    }
+
+    // Resolve the possessed pawn (not just a Character) so targeting works
+    // regardless of the exact player pawn subclass.
+    if (!IsValid(FoundTarget))
+    {
+        FoundTarget = UGameplayStatics::GetPlayerPawn(this, 0);
+    }
+    if (!IsValid(FoundTarget))
+    {
+        FoundTarget = UGameplayStatics::GetPlayerCharacter(this, 0);
+    }
+
+    // Fallback for a tank that exists in the level but is not possessed yet.
+    if (!IsValid(FoundTarget) && GetWorld())
     {
         TArray<AActor*> FoundActors;
-        UGameplayStatics::GetAllActorsOfClass(
-            GetWorld(),
-            ATank::StaticClass(),
-            FoundActors
-        );
-
+        UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATank::StaticClass(), FoundActors);
         for (AActor* Actor : FoundActors)
         {
-            FoundTank = Cast<ATank>(Actor);
-            if (IsValid(FoundTank))
+            if (IsValid(Actor))
             {
+                FoundTarget = Actor;
                 break;
             }
         }
     }
 
-    CachedTank = IsValid(FoundTank) ? FoundTank : nullptr;
-
-    // The Rocket child Blueprint uses the inherited TankREF variable.
-    // Write it without declaring a duplicate native UPROPERTY.
+    CachedTank = IsValid(FoundTarget) ? FoundTarget : nullptr;
     WriteBlueprintObject(FName(TEXT("TankREF")), CachedTank);
+
+    UE_LOG(LogTemp, Log, TEXT("%s: turret target = %s"), *GetName(),
+        IsValid(CachedTank) ? *CachedTank->GetName() : TEXT("<NOT FOUND>"));
 }
 
 void ABaseEnemyTurret::UpdateTurretAim()
 {
+    if (!IsValid(CachedTank))
+    {
+        FindPlayerTank();
+    }
+    if (!IsValid(CachedTurretSpin))
+    {
+        CacheBlueprintComponents();
+    }
     if (!IsValid(CachedTank) || !IsValid(CachedTurretSpin))
     {
         return;
     }
 
-    FVector Direction =
-        CachedTank->GetActorLocation() -
-        CachedTurretSpin->GetComponentLocation();
-
-    // The original Blueprint sets roll and pitch to zero and interpolates yaw.
-    Direction.Z = 0.0f;
-
-    if (Direction.IsNearlyZero())
+    const FVector TurretLocation = CachedTurretSpin->GetComponentLocation();
+    FVector TargetLocation = CachedTank->GetActorLocation();
+    TargetLocation.Z = TurretLocation.Z;
+    const FVector ToTarget = TargetLocation - TurretLocation;
+    if (ToTarget.IsNearlyZero())
     {
         return;
     }
 
-    FRotator TargetRotation = Direction.Rotation();
-    TargetRotation.Pitch = 0.0f;
-    TargetRotation.Roll = 0.0f;
+    const FRotator CurrentWorldRotation = CachedTurretSpin->GetComponentRotation();
+    const FRotator DesiredWorldRotation(0.0f, ToTarget.Rotation().Yaw, 0.0f);
+    const float DeltaSeconds = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.0f;
+    const FRotator SmoothedRotation = FMath::RInterpTo(
+        CurrentWorldRotation, DesiredWorldRotation, DeltaSeconds, 4.0f);
 
-    const FRotator NewRotation = FMath::RInterpTo(
-        CachedTurretSpin->GetComponentRotation(),
-        TargetRotation,
-        GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.0f,
-        2.0f
-    );
-
-    CachedTurretSpin->SetWorldRotation(NewRotation);
+    // Always apply the aim after recoil updates in Tick. The launch arrows are
+    // children of the rotating turret assembly and inherit this world yaw.
+    CachedTurretSpin->SetWorldRotation(SmoothedRotation);
 }
 
 void ABaseEnemyTurret::FireCheck()
@@ -460,11 +527,314 @@ void ABaseEnemyTurret::ExecuteNativeMachineGunFire()
     bMachineGunShakeActive = true;
 }
 
+void ABaseEnemyTurret::UpdateNativeLightningAttack(float DeltaTime)
+{
+    if (!bLightningAttackActive || !GetClass()->GetName().Contains(TEXT("Enemy_Lightning")))
+    {
+        return;
+    }
+
+    LightningAttackElapsed = FMath::Min(LightningAttackElapsed + DeltaTime, 5.0f);
+    const float Alpha = FMath::Clamp(LightningAttackElapsed / 5.0f, 0.0f, 1.0f);
+    const float Buildup = FMath::Sin(PI * Alpha);
+    const float TurretMovement = -2.0f * Buildup;
+
+    // The exported Blueprint timeline drives LT1/LT2 from a 0..1 buildup
+    // track (multipliers 40 and 300) and offsets the turret pivot while firing.
+    if (IsValid(CachedLightningCharge))
+    {
+        CachedLightningCharge->SetFloatParameter(FName(TEXT("LT1")), Buildup * 40.0f);
+        CachedLightningCharge->SetFloatParameter(FName(TEXT("LT2")), Buildup * 300.0f);
+    }
+    if (IsValid(CachedLightningCharge1))
+    {
+        CachedLightningCharge1->SetFloatParameter(FName(TEXT("LT1")), Buildup * 40.0f);
+        CachedLightningCharge1->SetFloatParameter(FName(TEXT("LT2")), Buildup * 300.0f);
+    }
+
+    if (IsValid(CachedTurretSpin))
+    {
+        // Match the original BP_Enemy_Lightning graph exactly: the
+        // SetRelativeLocationAndRotation node writes X=0, Y=0 and
+        // Z=(TurretMovement * 5) + 7. It does NOT add that offset to the
+        // component's existing relative location. Adding it to the authored
+        // transform caused the whole turret to sit too high above its base.
+        const FVector OriginalBlueprintRelativeLocation(
+            0.0f, 0.0f, (TurretMovement * 5.0f) + 7.0f);
+
+        const FRotator ExistingRelativeRotation = CachedTurretSpin->GetRelativeRotation();
+        FRotator OriginalBlueprintRelativeRotation(
+            0.0f,
+            0.0f - TurretMovement,
+            ExistingRelativeRotation.Yaw);
+
+        CachedTurretSpin->SetRelativeLocationAndRotation(
+            OriginalBlueprintRelativeLocation, OriginalBlueprintRelativeRotation);
+    }
+
+    if (Alpha >= 1.0f)
+    {
+        bLightningAttackActive = false;
+        if (IsValid(CachedLightningCharge))
+        {
+            CachedLightningCharge->SetFloatParameter(FName(TEXT("LT1")), 0.0f);
+            CachedLightningCharge->SetFloatParameter(FName(TEXT("LT2")), 0.0f);
+        }
+        if (IsValid(CachedLightningCharge1))
+        {
+            CachedLightningCharge1->SetFloatParameter(FName(TEXT("LT1")), 0.0f);
+            CachedLightningCharge1->SetFloatParameter(FName(TEXT("LT2")), 0.0f);
+        }
+    }
+}
+
+void ABaseEnemyTurret::ExecuteNativeLightningFire()
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    // Match the authored Blueprint: blast at the turret, sphere trace for
+    // Pawn objects using Range, then apply 5 damage and attach the hit burst.
+    if (LightningBlastEffect)
+    {
+        UGameplayStatics::SpawnEmitterAtLocation(
+            GetWorld(), LightningBlastEffect, GetActorLocation(), FRotator::ZeroRotator,
+            FVector::OneVector, true);
+    }
+
+    const float Radius = FMath::Max(0.0f, ReadBlueprintFloat(FName(TEXT("Range")), 500.0f));
+    if (Radius > 0.0f)
+    {
+        FCollisionObjectQueryParams ObjectQuery;
+        ObjectQuery.AddObjectTypesToQuery(ECC_Pawn);
+        FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(NativeLightningSphereTrace), false, this);
+        QueryParams.AddIgnoredActor(this);
+
+        TArray<FHitResult> Hits;
+        const FCollisionShape Sphere = FCollisionShape::MakeSphere(Radius);
+        const FVector TraceStart = GetActorLocation();
+        const FVector TraceEnd = TraceStart + FVector(0.0f, 0.0f, 1.0f);
+        GetWorld()->SweepMultiByObjectType(Hits, TraceStart, TraceEnd, FQuat::Identity,
+            ObjectQuery, Sphere, QueryParams);
+
+        TSet<AActor*> DamagedActors;
+        for (const FHitResult& Hit : Hits)
+        {
+            AActor* HitActor = Hit.GetActor();
+            if (!IsValid(HitActor) || HitActor == this || DamagedActors.Contains(HitActor))
+            {
+                continue;
+            }
+            DamagedActors.Add(HitActor);
+            UGameplayStatics::ApplyDamage(HitActor, 5.0f, GetInstigatorController(), this, nullptr);
+
+            if (LightningHitEffect && IsValid(Hit.GetComponent()))
+            {
+                UGameplayStatics::SpawnEmitterAttached(
+                    LightningHitEffect, Hit.GetComponent(), NAME_None, FVector::ZeroVector,
+                    FRotator::ZeroRotator, FVector::OneVector,
+                    EAttachLocation::SnapToTarget, true);
+            }
+        }
+    }
+
+    LightningAttackElapsed = 0.0f;
+    bLightningAttackActive = true;
+}
+
+
+void ABaseEnemyTurret::CacheRocketComponents()
+{
+    if (!IsValid(CachedRocketArrow0) || !IsValid(CachedRocketArrow1) ||
+        !IsValid(CachedRocketMesh0) || !IsValid(CachedRocketMesh1))
+    {
+        TArray<UArrowComponent*> Arrows;
+        GetComponents<UArrowComponent>(Arrows);
+        for (UArrowComponent* Arrow : Arrows)
+        {
+            if (!IsValid(Arrow)) continue;
+            if (Arrow->GetFName() == FName(TEXT("Arrow"))) CachedRocketArrow0 = Arrow;
+            else if (Arrow->GetFName() == FName(TEXT("Arrow1"))) CachedRocketArrow1 = Arrow;
+        }
+
+        TArray<USceneComponent*> SceneComponents;
+        GetComponents<USceneComponent>(SceneComponents);
+        for (USceneComponent* Component : SceneComponents)
+        {
+            if (!IsValid(Component)) continue;
+            if (Component->GetFName() == FName(TEXT("StaticMesh_0"))) CachedRocketMesh0 = Component;
+            else if (Component->GetFName() == FName(TEXT("StaticMesh1"))) CachedRocketMesh1 = Component;
+        }
+    }
+}
+
+void ABaseEnemyTurret::ExecuteNativeRocketFire()
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    CacheRocketComponents();
+
+    const bool bUseArrow0 = ReadBlueprintBool(FName(TEXT("Point")), false);
+    UArrowComponent* LaunchArrow = bUseArrow0 ? CachedRocketArrow0 : CachedRocketArrow1;
+
+    if (!IsValid(LaunchArrow))
+    {
+        UE_LOG(LogTemp, Error, TEXT("%s: Rocket launch arrow component not found (Arrow/Arrow1)."), *GetName());
+        return;
+    }
+
+    if (!RocketProjectileClass)
+    {
+        UE_LOG(LogTemp, Error, TEXT("%s: Could not load /Game/Scripts/Gameplay/Weapons/BP_Rocket."), *GetName());
+        return;
+    }
+
+    // The original Blueprint alternates launch points using Point:
+    // Point=false launches from Arrow1 and sets Point=true;
+    // Point=true launches from Arrow and sets Point=false.
+    WriteBlueprintBool(FName(TEXT("Point")), !bUseArrow0);
+
+    FVector AimTarget = IsValid(CachedTank) ? CachedTank->GetActorLocation() : GetActorLocation();
+    AimTarget.Z -= 20.0f;
+
+    const FVector SpawnLocation = LaunchArrow->GetComponentLocation();
+    const FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(SpawnLocation, AimTarget);
+
+    // The Blueprint takes Roll and Yaw from the Arrow's world rotation,
+    // but takes Pitch from Find Look at Rotation.
+    FRotator SpawnRotation = LaunchArrow->GetComponentRotation();
+    SpawnRotation.Pitch = LookAtRotation.Pitch;
+
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = this;
+    SpawnParams.Instigator = GetInstigator();
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::Undefined;
+
+    AActor* SpawnedRocket = GetWorld()->SpawnActor<AActor>(
+        RocketProjectileClass,
+        FTransform(SpawnRotation, SpawnLocation, FVector::OneVector),
+        SpawnParams);
+
+    // BP_Rocket owns the ProjectileMovement component. Enable Unreal's native
+    // homing on the spawned instance so the projectile steers after launch,
+    // while preserving the Blueprint's original speed, gravity and overlap logic.
+    AActor* HomingTarget = IsValid(CachedTank) ? Cast<AActor>(CachedTank) : nullptr;
+    if (IsValid(SpawnedRocket) && IsValid(HomingTarget))
+    {
+        UProjectileMovementComponent* ProjectileMovement =
+            SpawnedRocket->FindComponentByClass<UProjectileMovementComponent>();
+        USceneComponent* TargetComponent = HomingTarget->GetRootComponent();
+
+        if (IsValid(ProjectileMovement) && IsValid(TargetComponent))
+        {
+            ProjectileMovement->HomingTargetComponent = TargetComponent;
+            ProjectileMovement->HomingAccelerationMagnitude = 3500.0f;
+            ProjectileMovement->bIsHomingProjectile = true;
+            ProjectileMovement->Activate(true);
+
+            UE_LOG(LogTemp, Verbose, TEXT("%s: Rocket %s homing towards %s."),
+                *GetName(), *SpawnedRocket->GetName(), *HomingTarget->GetName());
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning,
+                TEXT("%s: Spawned BP_Rocket but could not configure homing (ProjectileMovement=%s, TargetComponent=%s)."),
+                *GetName(), IsValid(ProjectileMovement) ? TEXT("valid") : TEXT("missing"),
+                IsValid(TargetComponent) ? TEXT("valid") : TEXT("missing"));
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s: Rocket spawned without homing because no valid TankREF target was available."), *GetName());
+    }
+
+    // The child Blueprint starts the two authored timelines after spawning.
+    // The toggled Point selects which of the two rocket-rig meshes receives
+    // its short recoil animation.
+    RocketShakeElapsed = 0.0f;
+    bRocketShakeActive = true;
+}
+
+void ABaseEnemyTurret::UpdateNativeRocketShake(float DeltaTime)
+{
+    if (!bRocketShakeActive || !GetClass()->GetName().Contains(TEXT("Enemy_Rocket")))
+    {
+        return;
+    }
+
+    CacheRocketComponents();
+
+    RocketShakeElapsed = FMath::Min(RocketShakeElapsed + DeltaTime, 5.0f);
+    const float Alpha = FMath::Clamp(RocketShakeElapsed / 5.0f, 0.0f, 1.0f);
+
+    // Exported RocketShake/GunShake timelines are 5 seconds long. The visible
+    // track has a 0 -> -2 -> 0 recoil shape; use a smooth half-wave between
+    // those endpoints to reproduce the authored movement without Blueprint timelines.
+    const float TrackValue = -2.0f * FMath::Sin(PI * Alpha);
+
+    if (IsValid(CachedTurretSpin))
+    {
+        const FVector OriginalGraphLocation(0.0f, 0.0f, TrackValue + 7.0f);
+        const float ExistingYaw = CachedTurretSpin->GetRelativeRotation().Yaw;
+        // FRotator constructor order is Pitch, Yaw, Roll.
+        // The original Blueprint sets Roll=0, Pitch=(0 - TurretMovement),
+        // and preserves RelativeRotation.Yaw. Do not put yaw in the Roll slot.
+        const FRotator OriginalGraphRotation(-TrackValue, ExistingYaw, 0.0f);
+        CachedTurretSpin->SetRelativeLocationAndRotation(
+            OriginalGraphLocation, OriginalGraphRotation);
+    }
+
+    // After Point is toggled by Turret Fire, true drives StaticMesh_0
+    // (RocketShake); false drives StaticMesh1 (Timeline_0).
+    const bool bUseMesh0 = ReadBlueprintBool(FName(TEXT("Point")), false);
+    USceneComponent* RecoilMesh = bUseMesh0 ? CachedRocketMesh0 : CachedRocketMesh1;
+    if (IsValid(RecoilMesh))
+    {
+        RecoilMesh->SetRelativeLocation(FVector(0.0f, TrackValue, 0.0f));
+    }
+
+    if (Alpha >= 1.0f)
+    {
+        bRocketShakeActive = false;
+        if (IsValid(CachedTurretSpin))
+        {
+            const float ExistingYaw = CachedTurretSpin->GetRelativeRotation().Yaw;
+            // Reset pitch and roll while retaining yaw in FRotator's Yaw slot.
+            CachedTurretSpin->SetRelativeLocationAndRotation(
+                FVector(0.0f, 0.0f, 7.0f),
+                FRotator(0.0f, ExistingYaw, 0.0f));
+        }
+        const bool bFinishOnMesh0 = ReadBlueprintBool(FName(TEXT("Point")), false);
+        USceneComponent* FinishedMesh = bFinishOnMesh0 ? CachedRocketMesh0 : CachedRocketMesh1;
+        if (IsValid(FinishedMesh))
+        {
+            FinishedMesh->SetRelativeLocation(FVector::ZeroVector);
+        }
+    }
+}
+
 void ABaseEnemyTurret::ExecuteChildTurretFire()
 {
     if (GetClass()->GetName().Contains(TEXT("Enemy_MachineGun")))
     {
         ExecuteNativeMachineGunFire();
+        return;
+    }
+
+    if (GetClass()->GetName().Contains(TEXT("Enemy_Lightning")))
+    {
+        ExecuteNativeLightningFire();
+        return;
+    }
+
+    if (GetClass()->GetName().Contains(TEXT("Enemy_Rocket")))
+    {
+        ExecuteNativeRocketFire();
         return;
     }
 
@@ -520,6 +890,24 @@ void ABaseEnemyTurret::HandleHealthDeathWithContext(
     HandleHealthDeath();
 }
 
+
+bool ABaseEnemyTurret::ReadBlueprintBool(FName VariableName, bool DefaultValue) const
+{
+    if (const FBoolProperty* Property = FindFProperty<FBoolProperty>(GetClass(), VariableName))
+    {
+        return Property->GetPropertyValue_InContainer(this);
+    }
+    return DefaultValue;
+}
+
+void ABaseEnemyTurret::WriteBlueprintBool(FName VariableName, bool Value)
+{
+    if (FBoolProperty* Property = FindFProperty<FBoolProperty>(GetClass(), VariableName))
+    {
+        Property->SetPropertyValue_InContainer(this, Value);
+    }
+}
+
 float ABaseEnemyTurret::ReadBlueprintFloat(
     FName VariableName,
     float DefaultValue
@@ -544,6 +932,15 @@ void ABaseEnemyTurret::WriteBlueprintFloat(
     {
         Property->SetPropertyValue_InContainer(this, Value);
     }
+}
+
+UObject* ABaseEnemyTurret::ReadBlueprintObject(FName VariableName) const
+{
+    if (FObjectPropertyBase* Property = FindFProperty<FObjectPropertyBase>(GetClass(), VariableName))
+    {
+        return Property->GetObjectPropertyValue_InContainer(this);
+    }
+    return nullptr;
 }
 
 void ABaseEnemyTurret::WriteBlueprintObject(
