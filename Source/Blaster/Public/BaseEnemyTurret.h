@@ -5,11 +5,13 @@
 #include "BaseEnemyTurret.generated.h"
 
 class ATank;
-class UHealthComponent;
 class AController;
 class UActorComponent;
 class USceneComponent;
 class UParticleSystem;
+class UParticleSystemComponent;
+class UArrowComponent;
+class UHealthComponent;
 
 /**
  * Shared native parent for BP_BaseEnemyTurret and its weapon-specific children.
@@ -43,14 +45,23 @@ private:
     UPROPERTY(Transient)
     TObjectPtr<USceneComponent> CachedDangerZone;
 
-    // The supplied project uses BPC_HealthComponent (a Blueprint component
-    // whose native parent is UActorComponent), not UHealthComponent.
-    UPROPERTY(Transient)
-    TObjectPtr<UActorComponent> CachedHealthActorComponent;
-
-    // Native health component: replaces the Blueprint BPC_HealthComponent.
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Health", meta=(AllowPrivateAccess="true"))
+    // Native health component used by the previously working enemy damage path.
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Health", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UHealthComponent> NativeHealthComponent;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UArrowComponent> CachedMachineGunArrow;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UParticleSystem> MachineGunBeamEffect;
+
+    UPROPERTY(Transient)
+    TObjectPtr<UParticleSystem> MachineGunMissEffect;
+
+    float MachineGunShakeElapsed = 0.0f;
+    bool bMachineGunShakeActive = false;
+    FVector MachineGunTurretSpinBaseRelativeLocation = FVector::ZeroVector;
+    bool bHasMachineGunTurretSpinBaseLocation = false;
 
     UPROPERTY(Transient)
     TObjectPtr<ATank> CachedTank;
@@ -58,12 +69,13 @@ private:
     FTimerHandle FireTimerHandle;
 
     void CacheBlueprintComponents();
-    void InitialiseBlueprintHealthComponent();
     void InitialiseNativeHealthComponent();
     void FindPlayerTank();
     void UpdateTurretAim();
     void FireCheck();
     void ExecuteChildTurretFire();
+    void UpdateNativeMachineGunShake(float DeltaTime);
+    void ExecuteNativeMachineGunFire();
 
     float ReadBlueprintFloat(FName VariableName, float DefaultValue) const;
     void WriteBlueprintFloat(FName VariableName, float Value);

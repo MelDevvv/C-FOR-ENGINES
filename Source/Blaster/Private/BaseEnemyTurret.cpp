@@ -2,6 +2,8 @@
 
 #include "Tank.h"
 #include "HealthComponent.h"
+#include "Components/ArrowComponent.h"
+#include "Particles/ParticleSystemComponent.h"
 
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
@@ -31,6 +33,20 @@ ABaseEnemyTurret::ABaseEnemyTurret()
     if (DeathEffectAsset.Succeeded())
     {
         NativeDeathEffect = DeathEffectAsset.Object;
+    }
+
+    static ConstructorHelpers::FObjectFinder<UParticleSystem> MachineGunBeamAsset(
+        TEXT("/Game/Assets/Effects/PS_LineTraceBeam.PS_LineTraceBeam"));
+    if (MachineGunBeamAsset.Succeeded())
+    {
+        MachineGunBeamEffect = MachineGunBeamAsset.Object;
+    }
+
+    static ConstructorHelpers::FObjectFinder<UParticleSystem> MachineGunMissAsset(
+        TEXT("/Game/Assets/Effects/PS_RocketExplosion.PS_RocketExplosion"));
+    if (MachineGunMissAsset.Succeeded())
+    {
+        MachineGunMissEffect = MachineGunMissAsset.Object;
     }
 }
 
@@ -90,6 +106,7 @@ void ABaseEnemyTurret::Tick(float DeltaTime)
     }
 
     UpdateTurretAim();
+    UpdateNativeMachineGunShake(DeltaTime);
 }
 
 void ABaseEnemyTurret::CacheBlueprintComponents()
@@ -99,7 +116,6 @@ void ABaseEnemyTurret::CacheBlueprintComponents()
 
     CachedTurretSpin = nullptr;
     CachedDangerZone = nullptr;
-    CachedHealthActorComponent = nullptr;
 
     for (UActorComponent* Component : Components)
     {
@@ -122,14 +138,6 @@ void ABaseEnemyTurret::CacheBlueprintComponents()
             CachedDangerZone = Cast<USceneComponent>(Component);
         }
 
-        // The uploaded project has a Blueprint-only BPC_HealthComponent whose
-        // native parent is ActorComponent. Do not cast it to UHealthComponent.
-        if (Component->GetFName() == FName(TEXT("HealthComponent")) ||
-            ComponentName.Contains(TEXT("HealthComponent")) ||
-            ComponentClassName.Contains(TEXT("BPC_HealthComponent")))
-        {
-            CachedHealthActorComponent = Component;
-        }
     }
 
     if (!CachedTurretSpin)
@@ -169,125 +177,6 @@ void ABaseEnemyTurret::InitialiseNativeHealthComponent()
     NativeHealthComponent->EDeath.AddUniqueDynamic(this, &ABaseEnemyTurret::HandleHealthDeathWithContext);
 
     UE_LOG(LogTemp, Log, TEXT("%s: Native health ready. MaxHealth=%.1f"), *GetName(), ConfiguredMaxHP);
-}
-
-void ABaseEnemyTurret::InitialiseBlueprintHealthComponent()
-{
-    if (!CachedHealthActorComponent)
-    {
-        return;
-    }
-
-    // Preserve a configured component MaxHealth. If it is unset (<= 0),
-    // fall back to the parent Blueprint's MaxHP variable.
-    const float MaxHP = ReadBlueprintFloat(FName(TEXT("MaxHP")), 50.0f);
-    float EffectiveMaxHealth = MaxHP;
-
-    if (FFloatProperty* MaxHealthProperty = FindFProperty<FFloatProperty>(
-        CachedHealthActorComponent->GetClass(), FName(TEXT("MaxHealth"))))
-    {
-        const float ConfiguredMaxHealth =
-            MaxHealthProperty->GetPropertyValue_InContainer(
-                CachedHealthActorComponent
-            );
-
-        if (ConfiguredMaxHealth > 0.0f)
-        {
-            EffectiveMaxHealth = ConfiguredMaxHealth;
-        }
-        else if (MaxHP > 0.0f)
-        {
-            MaxHealthProperty->SetPropertyValue_InContainer(
-                CachedHealthActorComponent,
-                MaxHP
-            );
-        }
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning,
-            TEXT("%s: HealthComponent has no MaxHealth float property."),
-            *GetName());
-    }
-
-    // The original Blueprint component exposes a ResetHealth function.
-    if (UFunction* ResetFunction = CachedHealthActorComponent->FindFunction(
-        FName(TEXT("ResetHealth"))))
-    {
-        CachedHealthActorComponent->ProcessEvent(ResetFunction, nullptr);
-    }
-    else
-    {
-        UE_LOG(LogTemp, Error,
-            TEXT("%s: HealthComponent has no ResetHealth function."),
-            *GetName());
-    }
-
-    // The supplied BPC_HealthComponent exposes the EDeath dispatcher.
-    // Support OnDeath as well in case the component is later replaced by the
-    // native UHealthComponent or its Blueprint child.
-    FMulticastDelegateProperty* DeathDelegateProperty =
-        FindFProperty<FMulticastDelegateProperty>(
-            CachedHealthActorComponent->GetClass(),
-            FName(TEXT("EDeath"))
-        );
-
-    if (!DeathDelegateProperty)
-    {
-        DeathDelegateProperty = FindFProperty<FMulticastDelegateProperty>(
-            CachedHealthActorComponent->GetClass(),
-            FName(TEXT("OnDeath"))
-        );
-    }
-
-    if (DeathDelegateProperty)
-    {
-        // The original BPC_HealthComponent.EDeath signature contains
-        // (AController*, AActor*). The native UHealthComponent.OnDeath
-        // dispatcher has no parameters, so select a matching handler.
-        int32 SignatureParameterCount = 0;
-        if (DeathDelegateProperty->SignatureFunction)
-        {
-            for (TFieldIterator<FProperty> It(DeathDelegateProperty->SignatureFunction); It; ++It)
-            {
-                if (It->HasAnyPropertyFlags(CPF_Parm) &&
-                    !It->HasAnyPropertyFlags(CPF_ReturnParm))
-                {
-                    ++SignatureParameterCount;
-                }
-            }
-        }
-
-        const FName HandlerName = SignatureParameterCount >= 2
-            ? FName(TEXT("HandleHealthDeathWithContext"))
-            : FName(TEXT("HandleHealthDeath"));
-
-        FScriptDelegate DeathBinding;
-        DeathBinding.BindUFunction(this, HandlerName);
-
-        void* DelegateValue =
-            DeathDelegateProperty->ContainerPtrToValuePtr<void>(
-                CachedHealthActorComponent
-            );
-
-        DeathDelegateProperty->AddDelegate(
-            DeathBinding,
-            CachedHealthActorComponent,
-            DelegateValue
-        );
-    }
-    else
-    {
-        UE_LOG(LogTemp, Error,
-            TEXT("%s: HealthComponent has neither EDeath nor OnDeath dispatcher."),
-            *GetName());
-    }
-
-    UE_LOG(LogTemp, Warning,
-        TEXT("%s: Health initialised. MaxHP = %.1f. Health component = %s."),
-        *GetName(),
-        EffectiveMaxHealth,
-        *CachedHealthActorComponent->GetClass()->GetName());
 }
 
 void ABaseEnemyTurret::FindPlayerTank()
@@ -423,8 +312,162 @@ void ABaseEnemyTurret::FireCheck()
     }
 }
 
+void ABaseEnemyTurret::UpdateNativeMachineGunShake(float DeltaTime)
+{
+    if (!GetClass()->GetName().Contains(TEXT("Enemy_MachineGun")) ||
+        !IsValid(CachedTurretSpin))
+    {
+        return;
+    }
+
+    if (!bHasMachineGunTurretSpinBaseLocation)
+    {
+        MachineGunTurretSpinBaseRelativeLocation =
+            CachedTurretSpin->GetRelativeLocation();
+        bHasMachineGunTurretSpinBaseLocation = true;
+    }
+
+    if (!bMachineGunShakeActive)
+    {
+        return;
+    }
+
+    MachineGunShakeElapsed = FMath::Min(MachineGunShakeElapsed + DeltaTime, 5.0f);
+    const float Alpha = FMath::Clamp(MachineGunShakeElapsed / 5.0f, 0.0f, 1.0f);
+
+    // The exported GunShake track is 0 -> -2 -> 0. Apply the motion to the
+    // authored pivot location instead of replacing its component transform.
+    const float TurretMovement = -2.0f * FMath::Sin(PI * Alpha);
+    // Keep the authored pivot centred. The old conversion added a constant
+    // +7 units on Y, which displaced the turret throughout repeated firing.
+    const FVector ShakeOffset(0.0f, 0.0f, TurretMovement);
+
+    CachedTurretSpin->SetRelativeLocation(
+        MachineGunTurretSpinBaseRelativeLocation + ShakeOffset,
+        false,
+        nullptr,
+        ETeleportType::None
+    );
+
+    if (Alpha >= 1.0f)
+    {
+        bMachineGunShakeActive = false;
+        CachedTurretSpin->SetRelativeLocation(
+            MachineGunTurretSpinBaseRelativeLocation,
+            false,
+            nullptr,
+            ETeleportType::None
+        );
+    }
+}
+
+void ABaseEnemyTurret::ExecuteNativeMachineGunFire()
+{
+    if (!IsValid(CachedMachineGunArrow))
+    {
+        TArray<UArrowComponent*> Arrows;
+        GetComponents<UArrowComponent>(Arrows);
+        for (UArrowComponent* Arrow : Arrows)
+        {
+            if (IsValid(Arrow) &&
+                (Arrow->GetFName() == FName(TEXT("Arrow")) ||
+                 Arrow->GetName().Contains(TEXT("Arrow"))))
+            {
+                CachedMachineGunArrow = Arrow;
+                break;
+            }
+        }
+    }
+
+    if (!IsValid(CachedMachineGunArrow) || !GetWorld())
+    {
+        UE_LOG(LogTemp, Error, TEXT("%s: Machine gun Arrow component not found."), *GetName());
+        return;
+    }
+
+    const FVector Start = CachedMachineGunArrow->GetComponentLocation();
+    const FVector End = Start + CachedMachineGunArrow->GetForwardVector() * 500.0f;
+
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(NativeMachineGunFire), false, this);
+    Params.AddIgnoredActor(this);
+
+    const ECollisionChannel Channel =
+        UEngineTypes::ConvertToCollisionChannel(ETraceTypeQuery::TraceTypeQuery1);
+
+    FHitResult Hit;
+
+    // A small sphere sweep is more forgiving than a zero-width line and helps
+    // the trace catch the tank's central collision body.
+    constexpr float TraceRadius = 18.0f;
+    const bool bHit = GetWorld()->SweepSingleByChannel(
+        Hit,
+        Start,
+        End,
+        FQuat::Identity,
+        Channel,
+        FCollisionShape::MakeSphere(TraceRadius),
+        Params
+    );
+
+    const FVector BeamEnd = bHit ? Hit.ImpactPoint : End;
+
+    if (bHit && Hit.GetActor())
+    {
+        UGameplayStatics::ApplyDamage(
+            Hit.GetActor(), 1.0f, GetInstigatorController(), this, nullptr
+        );
+
+        // Play the impact burst at the actual contact point, not at the
+        // far endpoint of the trace. Orient it along the surface normal.
+        if (MachineGunMissEffect)
+        {
+            const FRotator ImpactRotation =
+                Hit.ImpactNormal.IsNearlyZero()
+                    ? FRotator::ZeroRotator
+                    : Hit.ImpactNormal.Rotation();
+
+            UGameplayStatics::SpawnEmitterAtLocation(
+                GetWorld(),
+                MachineGunMissEffect,
+                Hit.ImpactPoint,
+                ImpactRotation,
+                FVector(0.25f),
+                true
+            );
+        }
+    }
+
+    if (MachineGunBeamEffect)
+    {
+        if (UParticleSystemComponent* Beam = UGameplayStatics::SpawnEmitterAtLocation(
+            GetWorld(), MachineGunBeamEffect, Start, FRotator::ZeroRotator,
+            FVector::OneVector, true))
+        {
+            Beam->SetBeamTargetPoint(0, BeamEnd, 0);
+        }
+    }
+
+    if (!bHit && MachineGunMissEffect)
+    {
+        // Preserve the original end-of-trace effect for a genuine miss.
+        UGameplayStatics::SpawnEmitterAtLocation(
+            GetWorld(), MachineGunMissEffect, End, FRotator::ZeroRotator,
+            FVector(0.25f), true
+        );
+    }
+
+    MachineGunShakeElapsed = 0.0f;
+    bMachineGunShakeActive = true;
+}
+
 void ABaseEnemyTurret::ExecuteChildTurretFire()
 {
+    if (GetClass()->GetName().Contains(TEXT("Enemy_MachineGun")))
+    {
+        ExecuteNativeMachineGunFire();
+        return;
+    }
+
     // Turret Fire is deliberately retained as a Blueprint function in
     // BP_BaseEnemyTurret. Each child Blueprint overrides it with its own
     // weapon (Machine Gun line trace, Lightning effects, or BP_Rocket spawn).
