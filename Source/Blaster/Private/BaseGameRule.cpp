@@ -1,30 +1,32 @@
-﻿#include "BaseGameRule.h"
+#include "BaseGameRule.h"
 
 UBaseGameRule::UBaseGameRule()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+    PrimaryComponentTick.bCanEverTick = false;
 }
 
 void UBaseGameRule::InitRule_Implementation(int32 InRuleID)
 {
-	RuleID = InRuleID;
-	Completed = false;
+    RuleID = InRuleID;
+    Completed = false;
 }
 
 void UBaseGameRule::CompleteRule_Implementation(bool bSuccessful)
 {
-	if (Completed)
-	{
-		return;
-	}
+    if (Completed)
+    {
+        return;
+    }
 
-	Completed = true;
-
-	OnRuleUpdated.Broadcast(RuleID, Completed);
-	OnRuleComplete.Broadcast(RuleID, bSuccessful);
+    Completed = true;
+    OnRuleUpdated.Broadcast(RuleID, Completed);
+    ERuleUpdated.Broadcast(RuleID, Completed);
+    OnRuleComplete.Broadcast(RuleID, bSuccessful);
+    ERuleComplete.Broadcast(RuleID, bSuccessful);
 }
 
 void UBaseGameRule::UpdateRuleConditions_Implementation()
 {
-	OnRuleUpdated.Broadcast(RuleID, Completed);
+    OnRuleUpdated.Broadcast(RuleID, Completed);
+    ERuleUpdated.Broadcast(RuleID, Completed);
 }
