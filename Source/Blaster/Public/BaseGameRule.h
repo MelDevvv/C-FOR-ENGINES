@@ -2,9 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "TimerManager.h"
 #include "BaseGameRule.generated.h"
 
 class UUserWidget;
+class AActor;
+class FMulticastDelegateProperty;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FRuleCompleteSignature, int32, RuleID, bool, bSuccessful);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FRuleUpdatedSignature, int32, RuleID, bool, bCompleted);
@@ -26,18 +29,15 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Rule")
     bool Completed = false;
 
-    // Retains the property exposed by the original BPC_BaseGameRule Blueprint.
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Rule")
     TSubclassOf<UUserWidget> RuleUI;
 
-    // Native equivalents of the original Blueprint multicast dispatchers.
     UPROPERTY(BlueprintAssignable, Category="Rule")
     FRuleCompleteSignature ERuleComplete;
 
     UPROPERTY(BlueprintAssignable, Category="Rule")
     FRuleUpdatedSignature ERuleUpdated;
 
-    // Kept as compatibility aliases for existing native code.
     UPROPERTY(BlueprintAssignable, Category="Rule")
     FRuleCompleteSignature OnRuleComplete;
 
@@ -52,4 +52,52 @@ public:
 
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Rule")
     void UpdateRuleConditions();
+
+    // Timer controls used by the original BPC_TimerGameRule custom events.
+    UFUNCTION(BlueprintCallable, Category="Rule|Timer")
+    void AddToTimer(float SecondsToAdd);
+
+    UFUNCTION(BlueprintCallable, Category="Rule|Timer")
+    void DeductFromTimer(float SecondsToRemove);
+
+    UFUNCTION(BlueprintPure, Category="Rule|Timer")
+    float GetTimerSecondsRemaining() const;
+
+protected:
+    // Shared with UEncounterGameRule, which inherits this manager reference.
+    UPROPERTY(Transient, BlueprintReadOnly, Category="Encounter Rule")
+    TObjectPtr<AActor> EncounterManager = nullptr;
+
+    virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+    UFUNCTION()
+    void HandleEncounterCompletion(int32 CompletedRuleID, bool bSuccessful);
+
+private:
+    // Existing Encounter Rule native binding.
+    bool IsEncounterRuleBlueprint() const;
+    AActor* FindBlueprintEncounterManager() const;
+    bool BindEncounterManager(AActor* Manager);
+    void TryBindEncounterManager();
+    void UnbindEncounterManager();
+
+    FScriptDelegate EncounterCompletionDelegate;
+    FMulticastDelegateProperty* EncounterCompletionProperty = nullptr;
+    bool bEncounterCompletionBound = false;
+
+    // Timer is activated only for the existing BPC_TimerGameRule Blueprint child.
+    FTimerHandle NativeRuleTimerHandle;
+    FTimerHandle NativeRuleTickHandle;
+    bool bNativeTimerRule = false;
+    bool bNativeTimerCompleted = false;
+
+    float ReadBlueprintTimerLength() const;
+    bool HasBlueprintTimerContract() const;
+    void StartNativeTimer(float DurationSeconds);
+    void NativeTimerCheck();
+    void NativeTimerExpired();
+    void ClearNativeTimerHandles();
+    bool BroadcastBlueprintTimerDispatcher(FName DispatcherName, bool bHasDoubleParameter = false, double DoubleParameter = 0.0);
 };
