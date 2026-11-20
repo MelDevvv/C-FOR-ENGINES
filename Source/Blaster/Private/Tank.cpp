@@ -16,13 +16,14 @@
 #include "TimerManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "MainUIWidget.h"
+#include "BoostHUDWidget.h"
 ATank::ATank()
 {
    PrimaryActorTick.bCanEverTick = true;
    bUseControllerRotationYaw = false;
    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
    {
-       Movement->MaxWalkSpeed = 600.0f;
+       Movement->MaxWalkSpeed = NormalMoveSpeed;
        Movement->bOrientRotationToMovement = false;
        Movement->bUseControllerDesiredRotation = false;
    }
@@ -95,7 +96,10 @@ void ATank::BeginPlay()
 &ATank::HandleTankDeath
        );
    }
+   CurrentBoostEnergy = MaximumBoostEnergy;
+   NormalCameraFOV = Camera ? Camera->FieldOfView : 90.0f;
    CreateTankHUD();
+   CreateBoostHUD();
    if (TGun01)
    {
        Gun1RestLocation = TGun01->GetRelativeLocation();
@@ -187,7 +191,101 @@ void ATank::Tick(float DeltaTime)
        }
    }
    UpdateGunShudders(DeltaTime);
+   UpdateBoost(DeltaTime);
 }
+void ATank::CreateBoostHUD()
+{
+   if (BoostHUD || !IsPlayerControlled())
+   {
+       return;
+   }
+
+   APlayerController* PC = Cast<APlayerController>(GetController());
+   if (!PC && GetWorld())
+   {
+       PC = GetWorld()->GetFirstPlayerController();
+   }
+
+   if (!PC)
+   {
+       UE_LOG(LogTemp, Warning, TEXT("Boost HUD not created: no PlayerController."));
+       return;
+   }
+
+   BoostHUD = CreateWidget<UBoostHUDWidget>(PC, UBoostHUDWidget::StaticClass());
+   if (BoostHUD)
+   {
+       BoostHUD->AddToViewport(10);
+       BoostHUD->UpdateBoostDisplay(CurrentBoostEnergy, MaximumBoostEnergy, bIsBoosting);
+   }
+}
+
+void ATank::SetBoostInput(bool bPressed)
+{
+   if (!bPressed)
+   {
+       bBoostInputHeld = false;
+       bBoostLockedUntilRelease = false;
+       StopBoost();
+       return;
+   }
+
+   if (bIsRespawning || bBoostLockedUntilRelease || CurrentBoostEnergy <= 1.0f)
+   {
+       return;
+   }
+
+   bBoostInputHeld = true;
+}
+
+void ATank::StopBoost()
+{
+   bIsBoosting = false;
+}
+
+void ATank::UpdateBoost(float DeltaTime)
+{
+   UCharacterMovementComponent* Movement = GetCharacterMovement();
+   if (!Movement)
+   {
+       return;
+   }
+
+   if (bBoostInputHeld && !bIsRespawning && !bBoostLockedUntilRelease && CurrentBoostEnergy > 0.0f)
+   {
+       bIsBoosting = true;
+       CurrentBoostEnergy = FMath::Max(0.0f, CurrentBoostEnergy - BoostDrainPerSecond * DeltaTime);
+
+       if (CurrentBoostEnergy <= KINDA_SMALL_NUMBER)
+       {
+           CurrentBoostEnergy = 0.0f;
+           bBoostLockedUntilRelease = true;
+           StopBoost();
+       }
+   }
+   else
+   {
+       StopBoost();
+       CurrentBoostEnergy = FMath::Min(
+           MaximumBoostEnergy,
+           CurrentBoostEnergy + BoostRechargePerSecond * DeltaTime);
+   }
+
+   Movement->MaxWalkSpeed = bIsBoosting ? BoostMoveSpeed : NormalMoveSpeed;
+
+   if (Camera)
+   {
+       const float TargetFOV = bIsBoosting ? BoostCameraFOV : NormalCameraFOV;
+       Camera->SetFieldOfView(FMath::FInterpTo(
+           Camera->FieldOfView, TargetFOV, DeltaTime, BoostFOVInterpSpeed));
+   }
+
+   if (BoostHUD)
+   {
+       BoostHUD->UpdateBoostDisplay(CurrentBoostEnergy, MaximumBoostEnergy, bIsBoosting);
+   }
+}
+
 void ATank::IMove_Implementation(float InputValue)
 {
    if (bIsRespawning || FMath::IsNearlyZero(InputValue) || !RotTracks)
@@ -364,6 +462,7 @@ void ATank::HandleTankDeath()
    {
        return;
    }
+   SetBoostInput(false);
    bIsRespawning = true;
    GetWorld()->GetTimerManager().ClearTimer(RespawnTimerHandle);
    GetWorld()->GetTimerManager().ClearTimer(FireRateTimerHandle);
@@ -421,5 +520,9 @@ void ATank::RespawnTank()
        HealthComp->ResetHealth();
    }
    bCanFire = true;
+   CurrentBoostEnergy = MaximumBoostEnergy;
+   bBoostInputHeld = false;
+   bBoostLockedUntilRelease = false;
+   StopBoost();
    bIsRespawning = false;
 }

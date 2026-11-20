@@ -4,6 +4,8 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
 #include "Inputable.h"
+#include "Tank.h"
+#include "InputCoreTypes.h"
 #include "Engine/LocalPlayer.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -144,6 +146,19 @@ void ATankController::SetupInputComponent()
             &ATankController::OnFire);
     }
 
+    // Boost is bound directly to Left Shift so no new Input Action asset is required.
+    InputComponent->BindKey(
+        EKeys::LeftShift,
+        IE_Pressed,
+        this,
+        &ATankController::OnBoostPressed);
+
+    InputComponent->BindKey(
+        EKeys::LeftShift,
+        IE_Released,
+        this,
+        &ATankController::OnBoostReleased);
+
     UE_LOG(LogTemp, Warning, TEXT("TankController input actions bound."));
 }
 
@@ -186,5 +201,21 @@ void ATankController::OnFire(const FInputActionInstance& Instance)
         IInputable::Execute_IPrimaryAction(
             ControlledPawn,
             Instance.GetValue().Get<bool>());
+    }
+}
+
+void ATankController::OnBoostPressed()
+{
+    if (ATank* Tank = Cast<ATank>(GetPawn()))
+    {
+        Tank->SetBoostInput(true);
+    }
+}
+
+void ATankController::OnBoostReleased()
+{
+    if (ATank* Tank = Cast<ATank>(GetPawn()))
+    {
+        Tank->SetBoostInput(false);
     }
 }

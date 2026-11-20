@@ -37,4 +37,6 @@ private:
 	void OnForward(const FInputActionInstance& Instance);
 	void OnTurn(const FInputActionInstance& Instance);
 	void OnFire(const FInputActionInstance& Instance);
+	void OnBoostPressed();
+	void OnBoostReleased();
 };

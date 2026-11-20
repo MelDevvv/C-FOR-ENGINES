@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Inputable.h"
@@ -11,6 +11,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UHealthComponent;
 class UMainUIWidget;
+class UBoostHUDWidget;
 UCLASS(Abstract)
 class BLASTER_API ATank : public ACharacter, public IInputable
 {
@@ -21,9 +22,33 @@ public:
    virtual void IMove_Implementation(float InputValue) override;
    virtual void ITurn_Implementation(float InputValue) override;
    virtual void IPrimaryAction_Implementation(bool bPressed) override;
+
+   /** Called by the native PlayerController when Left Shift is pressed/released. */
+   void SetBoostInput(bool bPressed);
    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tank|Movement",
        meta = (ClampMin = "0.0"))
    float TurnSpeed = 100.0f;
+
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Movement", meta = (ClampMin = "0.0"))
+   float NormalMoveSpeed = 400.0f;
+
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Boost", meta = (ClampMin = "0.0"))
+   float BoostMoveSpeed = 1000.0f;
+
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Boost", meta = (ClampMin = "1.0"))
+   float MaximumBoostEnergy = 100.0f;
+
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Boost", meta = (ClampMin = "0.0"))
+   float BoostDrainPerSecond = 35.0f;
+
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Boost", meta = (ClampMin = "0.0"))
+   float BoostRechargePerSecond = 22.0f;
+
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Boost", meta = (ClampMin = "0.0"))
+   float BoostCameraFOV = 102.0f;
+
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Boost", meta = (ClampMin = "0.1"))
+   float BoostFOVInterpSpeed = 5.0f;
    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tank|Weapons",
        meta = (ClampMin = "0.05"))
    float FireRateSeconds = 0.5f;
@@ -76,12 +101,20 @@ protected:
 private:
    UPROPERTY(Transient)
    TObjectPtr<UMainUIWidget> TankHUD;
+
+   UPROPERTY(Transient)
+   TObjectPtr<UBoostHUDWidget> BoostHUD;
    FTransform RespawnTransform;
    FTimerHandle FireRateTimerHandle;
    FTimerHandle RespawnTimerHandle;
    int32 NextGunIndex = 0;
    bool bCanFire = true;
    bool bIsRespawning = false;
+   bool bBoostInputHeld = false;
+   bool bIsBoosting = false;
+   bool bBoostLockedUntilRelease = false;
+   float CurrentBoostEnergy = 100.0f;
+   float NormalCameraFOV = 90.0f;
    float Gun1ShudderTime = 0.0f;
    float Gun2ShudderTime = 0.0f;
    bool bGun1ShudderActive = false;
@@ -96,4 +129,7 @@ private:
    void HandleTankDeath();
    void RespawnTank();
    void CreateTankHUD();
+   void CreateBoostHUD();
+   void UpdateBoost(float DeltaTime);
+   void StopBoost();
 };
