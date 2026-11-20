@@ -12,6 +12,7 @@ class UParticleSystem;
 class UParticleSystemComponent;
 class UArrowComponent;
 class UHealthComponent;
+class USphereComponent;
 
 /**
  * Shared native parent for BP_BaseEnemyTurret and its weapon-specific children.
@@ -44,6 +45,9 @@ private:
 
     UPROPERTY(Transient)
     TObjectPtr<USceneComponent> CachedDangerZone;
+
+    UPROPERTY(VisibleAnywhere, Category = "Enemy|AI|Detection Zone")
+    TObjectPtr<USphereComponent> DetectionZoneVisualization;
 
     // Native health component used by the previously working enemy damage path.
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Health", meta = (AllowPrivateAccess = "true"))
@@ -104,10 +108,71 @@ private:
 
     FTimerHandle FireTimerHandle;
 
+
+    // Shared movement AI inherited by all enemy child types.
+    FVector EnemyPatrolOrigin = FVector::ZeroVector;
+    FVector EnemyPatrolTarget = FVector::ZeroVector;
+    FVector EnemyDodgeTarget = FVector::ZeroVector;
+    FVector EnemyCombatMoveTarget = FVector::ZeroVector;
+    FVector EnemyLastKnownPlayerLocation = FVector::ZeroVector;
+    float EnemyLostPlayerSearchRemaining = 0.0f;
+    bool bEnemyHasLastKnownPlayerLocation = false;
+    TArray<FVector> EnemyCachedPathPoints;
+    int32 EnemyCachedPathIndex = 0;
+    float EnemyPathRebuildRemaining = 0.0f;
+    float EnemyCombatMoveRemaining = 0.0f;
+    bool bEnemyCombatMoveTargetValid = false;
+    float EnemyPatrolWaitRemaining = 0.0f;
+    float EnemyDodgeRemaining = 0.0f;
+    float EnemyDodgeCooldownRemaining = 0.0f;
+    float EnemyProjectileScanRemaining = 0.0f;
+    bool bEnemyDodgeActive = false;
+    bool bEnemyPatrolTargetValid = false;
+    bool bEnemyPatrolOriginSet = false;
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Enemy|AI|Detection Zone", meta = (AllowPrivateAccess = "true", ClampMin = "100.0", Units = "cm"))
+    float EnemyDetectionRadius = 800.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Enemy|AI|Movement", meta = (ClampMin = "100.0", Units = "cm"))
+    float EnemyPatrolRadius = 1000.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Enemy|AI|Movement", meta = (ClampMin = "100.0", Units = "cm"))
+    float EnemyDodgeDistance = 450.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Enemy|AI|Movement", meta = (ClampMin = "0.1"))
+    float EnemyDodgeDuration = 0.4f;
+
+    UPROPERTY(EditAnywhere, Category = "Enemy|AI|Movement", meta = (ClampMin = "0.1"))
+    float EnemyDodgeCooldown = 2.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Enemy|AI|Movement", meta = (ClampMin = "0.0", Units = "cm/s"))
+    float EnemyPatrolSpeed = 200.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Enemy|AI|Movement", meta = (ClampMin = "0.0", Units = "cm/s"))
+    float EnemyChaseSpeed = 500.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Enemy|AI|Movement", meta = (ClampMin = "0.0", Units = "cm/s"))
+    float EnemyDodgeSpeed = 900.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Enemy|AI|Movement", meta = (ClampMin = "0.0"))
+    float EnemyPatrolWaitMin = 2.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Enemy|AI|Movement", meta = (ClampMin = "0.0"))
+    float EnemyPatrolWaitMax = 4.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Enemy|AI|Search", meta = (ClampMin = "0.0", Units = "s"))
+    float EnemySearchDuration = 6.0f;
+
     void CacheBlueprintComponents();
     void InitialiseNativeHealthComponent();
     void FindPlayerTank();
     void UpdateTurretAim();
+    void UpdateEnemyMovementAI(float DeltaTime);
+    bool BuildEnemyNavigationPath(const FVector& Destination);
+    bool MoveEnemyAlongNavigationPath(float Speed, float DeltaTime);
+    void ClearEnemyNavigationPath();
+    void PickEnemyPatrolTarget();
+    bool TryEnemyDodgeIncomingProjectile();
     void FireCheck();
     void ExecuteChildTurretFire();
     void UpdateNativeMachineGunShake(float DeltaTime);

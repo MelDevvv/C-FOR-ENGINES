@@ -9,11 +9,15 @@
 #include "Components/ActorComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/PrimitiveComponent.h"
+#include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "GameFramework/Actor.h"
 #include "CollisionShape.h"
 #include "CollisionQueryParams.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/World.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Particles/ParticleSystem.h"
@@ -28,6 +32,12 @@ ABaseEnemyTurret::ABaseEnemyTurret()
     PrimaryActorTick.bCanEverTick = true;
     SetCanBeDamaged(true);
     NativeHealthComponent = CreateDefaultSubobject<UHealthComponent>(TEXT("NativeHealthComponent"));
+    DetectionZoneVisualization = CreateDefaultSubobject<USphereComponent>(TEXT("DetectionZoneVisualization"));
+    DetectionZoneVisualization->SetSphereRadius(EnemyDetectionRadius);
+    DetectionZoneVisualization->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    DetectionZoneVisualization->SetGenerateOverlapEvents(false);
+    DetectionZoneVisualization->SetHiddenInGame(true);
+    DetectionZoneVisualization->SetVisibility(true);
 
     // This is the effect referenced by the original BP_BaseEnemyTurret asset.
     static ConstructorHelpers::FObjectFinder<UParticleSystem> DeathEffectAsset(
@@ -80,6 +90,14 @@ void ABaseEnemyTurret::OnConstruction(const FTransform& Transform)
     Super::OnConstruction(Transform);
 
     CacheBlueprintComponents();
+    if (DetectionZoneVisualization)
+    {
+        if (RootComponent && DetectionZoneVisualization->GetAttachParent() != RootComponent)
+            DetectionZoneVisualization->AttachToComponent(RootComponent, FAttachmentTransformRules::KeepRelativeTransform);
+        DetectionZoneVisualization->SetSphereRadius(EnemyDetectionRadius);
+        DetectionZoneVisualization->SetHiddenInGame(true);
+        DetectionZoneVisualization->SetVisibility(true);
+    }
 
     // Reproduce BP_BaseEnemyTurret's Construction Script:
     // Health = MaxHP and DangerZone world scale = (Range, Range, 50).
@@ -102,6 +120,11 @@ void ABaseEnemyTurret::BeginPlay()
     CacheBlueprintComponents();
     InitialiseNativeHealthComponent();
     FindPlayerTank();
+    EnemyPatrolOrigin = GetActorLocation();
+    bEnemyPatrolOriginSet = true;
+    PickEnemyPatrolTarget();
+    EnemyPatrolWaitRemaining = 0.0f;
+    BuildEnemyNavigationPath(EnemyPatrolTarget);
 
     // BP_BaseEnemyTurret originally waited a random 0.0-0.9 seconds,
     // then started a repeating timer using its FireRate Blueprint variable.
@@ -136,6 +159,7 @@ void ABaseEnemyTurret::Tick(float DeltaTime)
     UpdateNativeMachineGunShake(DeltaTime);
     UpdateNativeLightningAttack(DeltaTime);
     UpdateNativeRocketShake(DeltaTime);
+    UpdateEnemyMovementAI(DeltaTime);
 
     // Aim last so the final transform for this frame always faces the player.
     // The child Arrow/Arrow1 launch points inherit this rotation, so rockets
@@ -277,6 +301,334 @@ void ABaseEnemyTurret::FindPlayerTank()
         IsValid(CachedTank) ? *CachedTank->GetName() : TEXT("<NOT FOUND>"));
 }
 
+
+void ABaseEnemyTurret::PickEnemyPatrolTarget()
+{
+    if (!bEnemyPatrolOriginSet)
+    {
+        EnemyPatrolOrigin = GetActorLocation();
+        bEnemyPatrolOriginSet = true;
+    }
+
+    const FVector2D RandomDirection = FMath::RandPointInCircle(EnemyPatrolRadius);
+    EnemyPatrolTarget = EnemyPatrolOrigin + FVector(RandomDirection.X, RandomDirection.Y, 0.0f);
+    EnemyPatrolTarget.Z = GetActorLocation().Z;
+    bEnemyPatrolTargetValid = true;
+}
+
+
+bool ABaseEnemyTurret::TryEnemyDodgeIncomingProjectile()
+{
+    if (!GetWorld() || EnemyDodgeCooldownRemaining > 0.0f)
+    {
+        return false;
+    }
+
+    TArray<AActor*> Actors;
+    UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName(TEXT("PlayerProjectile")), Actors);
+    if (Actors.IsEmpty())
+    {
+        // Fallback: inspect actors with ProjectileMovement; avoids requiring a tag.
+        UGameplayStatics::GetAllActorsOfClass(GetWorld(), AActor::StaticClass(), Actors);
+    }
+
+    const FVector EnemyLocation = GetActorLocation();
+    for (AActor* ProjectileActor : Actors)
+    {
+        if (!IsValid(ProjectileActor) || ProjectileActor == this || ProjectileActor == CachedTank)
+        {
+            continue;
+        }
+
+        UProjectileMovementComponent* ProjectileMovement =
+            ProjectileActor->FindComponentByClass<UProjectileMovementComponent>();
+        if (!IsValid(ProjectileMovement) || ProjectileMovement->Velocity.IsNearlyZero())
+        {
+            continue;
+        }
+
+        const FVector Velocity = ProjectileMovement->Velocity.GetSafeNormal();
+        const FVector ToEnemy = EnemyLocation - ProjectileActor->GetActorLocation();
+        const float AlongTrajectory = FVector::DotProduct(ToEnemy, Velocity);
+        if (AlongTrajectory < 0.0f || AlongTrajectory > 650.0f)
+        {
+            continue;
+        }
+
+        const FVector ClosestPoint = ProjectileActor->GetActorLocation() + Velocity * AlongTrajectory;
+        if (FVector::DistSquared(ClosestPoint, EnemyLocation) > FMath::Square(160.0f))
+        {
+            continue;
+        }
+
+        FVector SideDirection = FVector::CrossProduct(Velocity, FVector::UpVector).GetSafeNormal();
+        if (SideDirection.IsNearlyZero())
+        {
+            SideDirection = GetActorRightVector();
+        }
+        if (FMath::RandBool())
+        {
+            SideDirection *= -1.0f;
+        }
+
+        EnemyDodgeTarget = EnemyLocation + SideDirection * EnemyDodgeDistance;
+        EnemyDodgeTarget.Z = EnemyLocation.Z;
+        bEnemyDodgeActive = true;
+        EnemyDodgeRemaining = EnemyDodgeDuration;
+        EnemyDodgeCooldownRemaining = EnemyDodgeCooldown;
+        return true;
+    }
+
+    return false;
+}
+
+
+void ABaseEnemyTurret::ClearEnemyNavigationPath()
+{
+    EnemyCachedPathPoints.Reset();
+    EnemyCachedPathIndex = 0;
+    EnemyPathRebuildRemaining = 0.0f;
+}
+
+
+bool ABaseEnemyTurret::BuildEnemyNavigationPath(const FVector& Destination)
+{
+    if (!GetWorld())
+    {
+        ClearEnemyNavigationPath();
+        return false;
+    }
+
+    UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(
+        GetWorld(), GetActorLocation(), Destination, this);
+
+    if (!Path || !Path->IsValid() || Path->PathPoints.Num() < 2)
+    {
+        ClearEnemyNavigationPath();
+        return false;
+    }
+
+    EnemyCachedPathPoints = Path->PathPoints;
+    EnemyCachedPathIndex = 1; // Skip the path's starting point.
+    EnemyPathRebuildRemaining = 0.35f;
+    return true;
+}
+
+
+bool ABaseEnemyTurret::MoveEnemyAlongNavigationPath(float Speed, float DeltaTime)
+{
+    if (EnemyCachedPathPoints.Num() < 2 || EnemyCachedPathIndex >= EnemyCachedPathPoints.Num())
+    {
+        return false;
+    }
+
+    FVector Waypoint = EnemyCachedPathPoints[EnemyCachedPathIndex];
+    FVector ToWaypoint = Waypoint - GetActorLocation();
+    ToWaypoint.Z = 0.0f;
+
+    if (ToWaypoint.SizeSquared() < FMath::Square(45.0f))
+    {
+        ++EnemyCachedPathIndex;
+        if (EnemyCachedPathIndex >= EnemyCachedPathPoints.Num())
+        {
+            ClearEnemyNavigationPath();
+            return false;
+        }
+        Waypoint = EnemyCachedPathPoints[EnemyCachedPathIndex];
+        ToWaypoint = Waypoint - GetActorLocation();
+        ToWaypoint.Z = 0.0f;
+    }
+
+    if (ToWaypoint.IsNearlyZero())
+    {
+        return true;
+    }
+
+    const FVector Step = ToWaypoint.GetSafeNormal() * Speed * DeltaTime;
+    FHitResult SweepHit;
+    AddActorWorldOffset(Step, true, &SweepHit);
+    if (SweepHit.IsValidBlockingHit())
+    {
+        ClearEnemyNavigationPath();
+        return false;
+    }
+    return true;
+}
+
+
+void ABaseEnemyTurret::UpdateEnemyMovementAI(float DeltaTime)
+{
+    if (!GetWorld())
+    {
+        return;
+    }
+
+    EnemyDodgeCooldownRemaining = FMath::Max(0.0f, EnemyDodgeCooldownRemaining - DeltaTime);
+    EnemyPatrolWaitRemaining = FMath::Max(0.0f, EnemyPatrolWaitRemaining - DeltaTime);
+    EnemyCombatMoveRemaining = FMath::Max(0.0f, EnemyCombatMoveRemaining - DeltaTime);
+    EnemyPathRebuildRemaining = FMath::Max(0.0f, EnemyPathRebuildRemaining - DeltaTime);
+    EnemyProjectileScanRemaining -= DeltaTime;
+
+    if (EnemyProjectileScanRemaining <= 0.0f)
+    {
+        EnemyProjectileScanRemaining = 0.25f;
+        if (!bEnemyDodgeActive)
+        {
+            TryEnemyDodgeIncomingProjectile();
+        }
+    }
+
+    if (bEnemyDodgeActive)
+    {
+        EnemyDodgeRemaining -= DeltaTime;
+        if (EnemyDodgeRemaining <= 0.0f || FVector::DistSquared2D(GetActorLocation(), EnemyDodgeTarget) < FMath::Square(40.0f))
+        {
+            bEnemyDodgeActive = false;
+            ClearEnemyNavigationPath();
+        }
+        else
+        {
+            if (EnemyCachedPathPoints.IsEmpty() || EnemyPathRebuildRemaining <= 0.0f)
+            {
+                BuildEnemyNavigationPath(EnemyDodgeTarget);
+            }
+            if (!MoveEnemyAlongNavigationPath(EnemyDodgeSpeed, DeltaTime))
+            {
+                // If navigation cannot reach the dodge point, try a short collision-swept sidestep.
+                FVector Side = (EnemyDodgeTarget - GetActorLocation()).GetSafeNormal2D();
+                if (!Side.IsNearlyZero())
+                {
+                    FHitResult Hit;
+                    AddActorWorldOffset(Side * EnemyDodgeSpeed * DeltaTime, true, &Hit);
+                    if (Hit.IsValidBlockingHit())
+                    {
+                        bEnemyDodgeActive = false;
+                    }
+                }
+            }
+            return;
+        }
+    }
+
+    const float PlayerDistance = IsValid(CachedTank)
+        ? FVector::Dist(GetActorLocation(), CachedTank->GetActorLocation())
+        : TNumericLimits<float>::Max();
+    const bool bPlayerDetected = IsValid(CachedTank) && PlayerDistance <= EnemyDetectionRadius;
+
+    if (bPlayerDetected)
+    {
+        EnemyLastKnownPlayerLocation = CachedTank->GetActorLocation();
+        bEnemyHasLastKnownPlayerLocation = true;
+        EnemyLostPlayerSearchRemaining = EnemySearchDuration;
+
+        // If the player is retreating beyond close combat distance, pursue their
+        // live position. Do not let a random lateral combat target stall pursuit.
+        if (PlayerDistance > 1100.0f)
+        {
+            EnemyPatrolWaitRemaining = 0.0f;
+            bEnemyCombatMoveTargetValid = false;
+            if (EnemyCachedPathPoints.IsEmpty() || EnemyPathRebuildRemaining <= 0.0f)
+            {
+                BuildEnemyNavigationPath(CachedTank->GetActorLocation());
+            }
+            if (!MoveEnemyAlongNavigationPath(EnemyChaseSpeed, DeltaTime))
+            {
+                // Navigation fallback: collision-swept movement toward the tank.
+                FVector ChaseDirection = (CachedTank->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+                FHitResult ChaseHit;
+                AddActorWorldOffset(ChaseDirection * EnemyChaseSpeed * DeltaTime, true, &ChaseHit);
+                if (ChaseHit.IsValidBlockingHit())
+                {
+                    ClearEnemyNavigationPath();
+                }
+            }
+            return;
+        }
+
+        // Close combat: keep moving laterally and reposition instead of stopping.
+        EnemyPatrolWaitRemaining = 0.0f;
+        if (!bEnemyCombatMoveTargetValid || EnemyCombatMoveRemaining <= 0.0f || EnemyCachedPathPoints.IsEmpty())
+        {
+            const FVector PlayerLocation = CachedTank->GetActorLocation();
+            FVector AwayFromPlayer = (GetActorLocation() - PlayerLocation).GetSafeNormal2D();
+            if (AwayFromPlayer.IsNearlyZero())
+            {
+                AwayFromPlayer = GetActorRightVector();
+            }
+            const FVector Side = FVector::CrossProduct(AwayFromPlayer, FVector::UpVector).GetSafeNormal();
+            const float SideSign = FMath::RandBool() ? 1.0f : -1.0f;
+            const float DesiredDistance = FMath::Clamp(PlayerDistance, 650.0f, 1100.0f);
+            EnemyCombatMoveTarget = PlayerLocation + AwayFromPlayer * DesiredDistance + Side * SideSign * FMath::RandRange(350.0f, 650.0f);
+            EnemyCombatMoveTarget.Z = GetActorLocation().Z;
+            bEnemyCombatMoveTargetValid = BuildEnemyNavigationPath(EnemyCombatMoveTarget);
+            EnemyCombatMoveRemaining = FMath::RandRange(1.2f, 2.4f);
+        }
+        if (bEnemyCombatMoveTargetValid && !MoveEnemyAlongNavigationPath(EnemyPatrolSpeed * 1.35f, DeltaTime))
+        {
+            bEnemyCombatMoveTargetValid = false;
+            ClearEnemyNavigationPath();
+        }
+        return;
+    }
+
+    // If the player escaped the detection radius, pursue the last seen position
+    // for a short search period, then sweep nearby points before resuming patrol.
+    if (bEnemyHasLastKnownPlayerLocation && EnemyLostPlayerSearchRemaining > 0.0f)
+    {
+        EnemyLostPlayerSearchRemaining = FMath::Max(0.0f, EnemyLostPlayerSearchRemaining - DeltaTime);
+        bEnemyCombatMoveTargetValid = false;
+        if (EnemyCachedPathPoints.IsEmpty() || EnemyPathRebuildRemaining <= 0.0f)
+        {
+            BuildEnemyNavigationPath(EnemyLastKnownPlayerLocation);
+        }
+        if (!MoveEnemyAlongNavigationPath(EnemyChaseSpeed, DeltaTime))
+        {
+            // Reached or couldn't reach last known position; search locally.
+            EnemyPatrolOrigin = EnemyLastKnownPlayerLocation;
+            bEnemyPatrolOriginSet = true;
+            bEnemyPatrolTargetValid = false;
+            EnemyLostPlayerSearchRemaining = 0.0f;
+            ClearEnemyNavigationPath();
+        }
+        return;
+    }
+    bEnemyHasLastKnownPlayerLocation = false;
+
+    bEnemyCombatMoveTargetValid = false;
+    if (EnemyPatrolWaitRemaining > 0.0f)
+    {
+        return;
+    }
+
+    if (!bEnemyPatrolTargetValid || FVector::DistSquared2D(GetActorLocation(), EnemyPatrolTarget) < FMath::Square(100.0f))
+    {
+        EnemyPatrolWaitRemaining = FMath::RandRange(EnemyPatrolWaitMin, EnemyPatrolWaitMax);
+        PickEnemyPatrolTarget();
+        ClearEnemyNavigationPath();
+        return;
+    }
+
+    if (EnemyCachedPathPoints.IsEmpty() || EnemyPathRebuildRemaining <= 0.0f)
+    {
+        BuildEnemyNavigationPath(EnemyPatrolTarget);
+    }
+
+    if (!MoveEnemyAlongNavigationPath(EnemyPatrolSpeed, DeltaTime))
+    {
+        // Fallback patrol movement so AI still starts moving if a nav query fails.
+        FVector PatrolDirection = (EnemyPatrolTarget - GetActorLocation()).GetSafeNormal2D();
+        FHitResult PatrolHit;
+        AddActorWorldOffset(PatrolDirection * EnemyPatrolSpeed * DeltaTime, true, &PatrolHit);
+        if (PatrolHit.IsValidBlockingHit() || PatrolDirection.IsNearlyZero())
+        {
+            EnemyPatrolWaitRemaining = FMath::RandRange(EnemyPatrolWaitMin, EnemyPatrolWaitMax);
+            bEnemyPatrolTargetValid = false;
+            ClearEnemyNavigationPath();
+        }
+    }
+}
+
+
 void ABaseEnemyTurret::UpdateTurretAim()
 {
     if (!IsValid(CachedTank))
@@ -320,6 +672,14 @@ void ABaseEnemyTurret::FireCheck()
     }
 
     if (!IsValid(CachedTank) || !GetWorld())
+    {
+        return;
+    }
+
+    // Separate awareness radius from weapon range: enemies only start firing
+    // when the player is within the shorter AI detection radius.
+    if (FVector::DistSquared(GetActorLocation(), CachedTank->GetActorLocation()) >
+        FMath::Square(EnemyDetectionRadius))
     {
         return;
     }
