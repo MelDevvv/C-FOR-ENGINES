@@ -159,6 +159,9 @@ void ATankController::SetupInputComponent()
         this,
         &ATankController::OnBoostReleased);
 
+    InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &ATankController::OnShieldPressed);
+    InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &ATankController::OnSecondaryRocketPressed);
+
     UE_LOG(LogTemp, Warning, TEXT("TankController input actions bound."));
 }
 
@@ -218,4 +221,15 @@ void ATankController::OnBoostReleased()
     {
         Tank->SetBoostInput(false);
     }
+}
+
+
+void ATankController::OnShieldPressed()
+{
+    if (ATank* Tank = Cast<ATank>(GetPawn())) Tank->ActivateShieldAbility();
+}
+
+void ATankController::OnSecondaryRocketPressed()
+{
+    if (ATank* Tank = Cast<ATank>(GetPawn())) Tank->FireSecondaryRocket();
 }

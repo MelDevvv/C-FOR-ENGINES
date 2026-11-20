@@ -39,4 +39,6 @@ private:
 	void OnFire(const FInputActionInstance& Instance);
 	void OnBoostPressed();
 	void OnBoostReleased();
+	void OnShieldPressed();
+	void OnSecondaryRocketPressed();
 };

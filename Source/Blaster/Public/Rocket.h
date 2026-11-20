@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
@@ -8,6 +8,7 @@ class USphereComponent;
 class UPrimitiveComponent;
 class UProjectileMovementComponent;
 class UParticleSystem;
+class USceneComponent;
 
 /**
  * Native gameplay implementation for the BP_Rocket projectile.
@@ -24,6 +25,8 @@ class BLASTER_API ARocket : public AActor
 
 public:
     ARocket();
+
+    void SetHomingTargetComponent(USceneComponent* TargetComponent, float HomingAcceleration = 3500.0f);
 
 protected:
     virtual void BeginPlay() override;
@@ -61,5 +64,5 @@ private:
         const FHitResult& SweepResult
     );
 
-    void HandleImpact();
+    void HandleImpact(AActor* OverlapActor);
 };

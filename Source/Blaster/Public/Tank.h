@@ -12,6 +12,10 @@ class UCameraComponent;
 class UHealthComponent;
 class UMainUIWidget;
 class UBoostHUDWidget;
+class UShieldComponent;
+class ARocket;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
 UCLASS(Abstract)
 class BLASTER_API ATank : public ACharacter, public IInputable
 {
@@ -25,6 +29,8 @@ public:
 
    /** Called by the native PlayerController when Left Shift is pressed/released. */
    void SetBoostInput(bool bPressed);
+   void ActivateShieldAbility();
+   void FireSecondaryRocket();
    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tank|Movement",
        meta = (ClampMin = "0.0"))
    float TurnSpeed = 100.0f;
@@ -91,6 +97,16 @@ protected:
    TObjectPtr<UArrowComponent> W4;
    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tank")
    TObjectPtr<UHealthComponent> HealthComp;
+   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tank|Abilities")
+   TObjectPtr<UShieldComponent> ShieldComp;
+
+   // Visual-only shield bubble. Collision is disabled so it cannot affect gameplay.
+   UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tank|Abilities|Shield Visual")
+   TObjectPtr<UStaticMeshComponent> ShieldBubble;
+
+   // Assign a translucent/emissive shield material in the Tank Blueprint.
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Abilities|Shield Visual")
+   TObjectPtr<UMaterialInterface> ShieldBubbleMaterial;
    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Weapons")
    TSubclassOf<AActor> ProjectileClass;
    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Weapons")
@@ -104,9 +120,18 @@ private:
 
    UPROPERTY(Transient)
    TObjectPtr<UBoostHUDWidget> BoostHUD;
+
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Weapons", meta=(AllowPrivateAccess="true"))
+   TSubclassOf<ARocket> SecondaryRocketClass;
+
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Weapons", meta=(ClampMin="0.1", AllowPrivateAccess="true"))
+   float SecondaryRocketCooldown = 3.0f;
+
+   float SecondaryRocketCooldownRemaining = 0.0f;
    FTransform RespawnTransform;
    FTimerHandle FireRateTimerHandle;
    FTimerHandle RespawnTimerHandle;
+   FTimerHandle SecondaryRocketTimerHandle;
    int32 NextGunIndex = 0;
    bool bCanFire = true;
    bool bIsRespawning = false;
@@ -131,5 +156,7 @@ private:
    void CreateTankHUD();
    void CreateBoostHUD();
    void UpdateBoost(float DeltaTime);
+   void UpdateShieldVisual();
    void StopBoost();
+   void ResetSecondaryRocketCooldown();
 };

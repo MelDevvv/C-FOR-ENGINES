@@ -1,4 +1,4 @@
-﻿#include "Tank.h"
+#include "Tank.h"
 #include "Components/ArrowComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -17,6 +17,13 @@
 #include "Kismet/GameplayStatics.h"
 #include "MainUIWidget.h"
 #include "BoostHUDWidget.h"
+#include "ShieldComponent.h"
+#include "Rocket.h"
+#include "BaseEnemyTurret.h"
+#include "GameFramework/ProjectileMovementComponent.h"
+#include "Components/SceneComponent.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 ATank::ATank()
 {
    PrimaryActorTick.bCanEverTick = true;
@@ -83,10 +90,42 @@ ATank::ATank()
    W4 = CreateDefaultSubobject<UArrowComponent>(TEXT("W4"));
    W4->SetupAttachment(TGun02);
    HealthComp = CreateDefaultSubobject<UHealthComponent>(TEXT("Health"));
+   ShieldComp = CreateDefaultSubobject<UShieldComponent>(TEXT("Shield"));
+
+   // Visual-only shield bubble. No collision or overlap events.
+   ShieldBubble = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldBubble"));
+   ShieldBubble->SetupAttachment(RootComponent);
+   ShieldBubble->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+   ShieldBubble->SetGenerateOverlapEvents(false);
+   ShieldBubble->SetCastShadow(false);
+   ShieldBubble->SetHiddenInGame(true);
+   ShieldBubble->SetRelativeScale3D(FVector(3.0f));
+
+   static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(
+       TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+   if (SphereMesh.Succeeded())
+   {
+       ShieldBubble->SetStaticMesh(SphereMesh.Object);
+   }
+
+   static ConstructorHelpers::FClassFinder<ARocket> RocketClassFinder(
+       TEXT("/Game/Scripts/Gameplay/Weapons/BP_Rocket"));
+   if (RocketClassFinder.Succeeded())
+   {
+       SecondaryRocketClass = RocketClassFinder.Class;
+   }
+   else
+   {
+       UE_LOG(LogTemp, Warning, TEXT("BP_Rocket class not found. Reparent BP_Rocket to native ARocket."));
+   }
 }
 void ATank::BeginPlay()
 {
    Super::BeginPlay();
+   if (ShieldBubble && ShieldBubbleMaterial)
+   {
+       ShieldBubble->SetMaterial(0, ShieldBubbleMaterial);
+   }
    RespawnTransform = GetActorTransform();
    if (HealthComp)
    {
@@ -100,6 +139,7 @@ void ATank::BeginPlay()
    NormalCameraFOV = Camera ? Camera->FieldOfView : 90.0f;
    CreateTankHUD();
    CreateBoostHUD();
+   if (ShieldComp) ShieldComp->ResetShield();
    if (TGun01)
    {
        Gun1RestLocation = TGun01->GetRelativeLocation();
@@ -192,6 +232,16 @@ void ATank::Tick(float DeltaTime)
    }
    UpdateGunShudders(DeltaTime);
    UpdateBoost(DeltaTime);
+   UpdateShieldVisual();
+   if (BoostHUD && ShieldComp)
+   {
+       BoostHUD->UpdateShieldDisplay(ShieldComp->GetCurrentEnergy(), ShieldComp->GetMaximumEnergy(), ShieldComp->IsShieldActive(), ShieldComp->GetCooldownRemaining());
+       BoostHUD->UpdateRocketDisplay(SecondaryRocketCooldownRemaining);
+   }
+   if (SecondaryRocketCooldownRemaining > 0.0f)
+   {
+       SecondaryRocketCooldownRemaining = FMath::Max(0.0f, SecondaryRocketCooldownRemaining - DeltaTime);
+   }
 }
 void ATank::CreateBoostHUD()
 {
@@ -284,6 +334,85 @@ void ATank::UpdateBoost(float DeltaTime)
    {
        BoostHUD->UpdateBoostDisplay(CurrentBoostEnergy, MaximumBoostEnergy, bIsBoosting);
    }
+}
+
+
+void ATank::UpdateShieldVisual()
+{
+    if (!ShieldBubble)
+    {
+        return;
+    }
+
+    const bool bShouldShow = ShieldComp && ShieldComp->IsShieldActive() && !bIsRespawning;
+    ShieldBubble->SetHiddenInGame(!bShouldShow);
+}
+
+void ATank::ActivateShieldAbility()
+{
+    if (bIsRespawning || !ShieldComp) return;
+    if (!ShieldComp->ActivateShield())
+    {
+        UE_LOG(LogTemp, Verbose, TEXT("Shield unavailable: active, depleted or cooling down."));
+    }
+    UpdateShieldVisual();
+}
+
+void ATank::FireSecondaryRocket()
+{
+    if (bIsRespawning || SecondaryRocketCooldownRemaining > 0.0f || !GetWorld()) return;
+    if (!SecondaryRocketClass)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Secondary rocket unavailable: BP_Rocket class was not loaded."));
+        return;
+    }
+
+    // Use the existing tank gun's forward-facing muzzle as the launch point.
+    USceneComponent* LaunchComponent = W1 ? Cast<USceneComponent>(W1) : Cast<USceneComponent>(TCore01);
+    if (!LaunchComponent) return;
+
+    FTransform SpawnTransform = LaunchComponent->GetComponentTransform();
+    if (TCore01) SpawnTransform.SetRotation(TCore01->GetComponentQuat());
+    SpawnTransform.SetLocation(LaunchComponent->GetComponentLocation() + SpawnTransform.GetRotation().GetForwardVector() * 80.0f);
+
+    FActorSpawnParameters SpawnParams;
+    SpawnParams.Owner = this;
+    SpawnParams.Instigator = this;
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+    ARocket* Rocket = GetWorld()->SpawnActor<ARocket>(SecondaryRocketClass, SpawnTransform, SpawnParams);
+    if (!Rocket) return;
+
+    // Home towards the nearest enemy turret, matching the enemy rocket's homing behaviour.
+    TArray<AActor*> EnemyTurrets;
+    UGameplayStatics::GetAllActorsOfClass(this, ABaseEnemyTurret::StaticClass(), EnemyTurrets);
+    ABaseEnemyTurret* NearestTurret = nullptr;
+    float BestDistanceSquared = TNumericLimits<float>::Max();
+    for (AActor* Candidate : EnemyTurrets)
+    {
+        if (!IsValid(Candidate) || Candidate == this) continue;
+        const float DistanceSquared = FVector::DistSquared(GetActorLocation(), Candidate->GetActorLocation());
+        if (DistanceSquared < BestDistanceSquared)
+        {
+            BestDistanceSquared = DistanceSquared;
+            NearestTurret = Cast<ABaseEnemyTurret>(Candidate);
+        }
+    }
+
+    if (NearestTurret && NearestTurret->GetRootComponent())
+    {
+        Rocket->SetHomingTargetComponent(NearestTurret->GetRootComponent(), 3500.0f);
+    }
+
+    SecondaryRocketCooldownRemaining = SecondaryRocketCooldown;
+    GetWorld()->GetTimerManager().SetTimer(
+        SecondaryRocketTimerHandle, this, &ATank::ResetSecondaryRocketCooldown,
+        FMath::Max(0.1f, SecondaryRocketCooldown), false);
+}
+
+void ATank::ResetSecondaryRocketCooldown()
+{
+    SecondaryRocketCooldownRemaining = 0.0f;
 }
 
 void ATank::IMove_Implementation(float InputValue)
@@ -463,6 +592,7 @@ void ATank::HandleTankDeath()
        return;
    }
    SetBoostInput(false);
+   if (ShieldComp) ShieldComp->ResetShield();
    bIsRespawning = true;
    GetWorld()->GetTimerManager().ClearTimer(RespawnTimerHandle);
    GetWorld()->GetTimerManager().ClearTimer(FireRateTimerHandle);
@@ -521,6 +651,8 @@ void ATank::RespawnTank()
    }
    bCanFire = true;
    CurrentBoostEnergy = MaximumBoostEnergy;
+   if (ShieldComp) ShieldComp->ResetShield();
+   SecondaryRocketCooldownRemaining = 0.0f;
    bBoostInputHeld = false;
    bBoostLockedUntilRelease = false;
    StopBoost();
