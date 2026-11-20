@@ -1,6 +1,7 @@
 #include "EndReachedWidget.h"
 
 #include "Components/TextBlock.h"
+#include "Styling/SlateColor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "UObject/UnrealType.h"
@@ -17,7 +18,10 @@ void UEndReachedWidget::NativeConstruct()
 
     if (T_Escape)
     {
-        T_Escape->SetText(FText::FromString(TEXT("Find the Exit")));
+        T_Escape->SetText(FText::FromString(TEXT("FIND THE EXIT  >")));
+        T_Escape->SetColorAndOpacity(FSlateColor(FLinearColor(0.3f,1.0f,0.55f,1.0f)));
+        FSlateFontInfo ExitFont = T_Escape->GetFont(); ExitFont.Size = 22; T_Escape->SetFont(ExitFont);
+        T_Escape->SetShadowOffset(FVector2D(2.0f,2.0f)); T_Escape->SetShadowColorAndOpacity(FLinearColor(0.0f,0.0f,0.0f,0.8f));
     }
 
     // It is hidden until the encounter manager confirms the final encounter is complete.
@@ -309,7 +313,10 @@ void UEndReachedWidget::ShowFindExit()
 {
     if (T_Escape)
     {
-        T_Escape->SetText(FText::FromString(TEXT("Find the Exit")));
+        T_Escape->SetText(FText::FromString(TEXT("FIND THE EXIT  >")));
+        T_Escape->SetColorAndOpacity(FSlateColor(FLinearColor(0.3f,1.0f,0.55f,1.0f)));
+        FSlateFontInfo ExitFont = T_Escape->GetFont(); ExitFont.Size = 22; T_Escape->SetFont(ExitFont);
+        T_Escape->SetShadowOffset(FVector2D(2.0f,2.0f)); T_Escape->SetShadowColorAndOpacity(FLinearColor(0.0f,0.0f,0.0f,0.8f));
     }
     SetVisibility(ESlateVisibility::HitTestInvisible);
 }

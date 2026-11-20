@@ -31,6 +31,7 @@ public:
    void SetBoostInput(bool bPressed);
    void ActivateShieldAbility();
    void FireSecondaryRocket();
+   void ActivateLightningBlast();
    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tank|Movement",
        meta = (ClampMin = "0.0"))
    float TurnSpeed = 100.0f;
@@ -111,6 +112,14 @@ protected:
    TSubclassOf<AActor> ProjectileClass;
    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Weapons")
    TObjectPtr<UParticleSystem> ShotCaseEffect;
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Abilities|Lightning", meta = (ClampMin = "0.0"))
+   float LightningBlastRadius = 1000.0f;
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Abilities|Lightning", meta = (ClampMin = "0.0"))
+   float LightningBlastDamage = 50.0f;
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Abilities|Lightning", meta = (ClampMin = "0.0"))
+   float LightningBlastCooldown = 30.0f;
+   UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Abilities|Lightning")
+   TObjectPtr<UParticleSystem> LightningBlastEffect;
    // Widget class loaded from WBP_MainUI.
    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|UI")
    TSubclassOf<UMainUIWidget> TankHUDClass;
@@ -128,6 +137,7 @@ private:
    float SecondaryRocketCooldown = 3.0f;
 
    float SecondaryRocketCooldownRemaining = 0.0f;
+   float LightningBlastCooldownRemaining = 0.0f;
    FTransform RespawnTransform;
    FTimerHandle FireRateTimerHandle;
    FTimerHandle RespawnTimerHandle;

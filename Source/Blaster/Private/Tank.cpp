@@ -26,6 +26,12 @@
 #include "Materials/MaterialInstanceDynamic.h"
 ATank::ATank()
 {
+   static ConstructorHelpers::FObjectFinder<UParticleSystem> LightningBlastAsset(
+       TEXT("/Game/Assets/Effects/PS_LightingBlast.PS_LightingBlast"));
+   if (LightningBlastAsset.Succeeded())
+   {
+       LightningBlastEffect = LightningBlastAsset.Object;
+   }
    PrimaryActorTick.bCanEverTick = true;
    bUseControllerRotationYaw = false;
    if (UCharacterMovementComponent* Movement = GetCharacterMovement())
@@ -202,6 +208,7 @@ void ATank::CreateTankHUD()
 }
 void ATank::Tick(float DeltaTime)
 {
+   LightningBlastCooldownRemaining = FMath::Max(0.0f, LightningBlastCooldownRemaining - DeltaTime);
    Super::Tick(DeltaTime);
    if (TCore01 && !bIsRespawning)
    {
@@ -356,6 +363,46 @@ void ATank::ActivateShieldAbility()
         UE_LOG(LogTemp, Verbose, TEXT("Shield unavailable: active, depleted or cooling down."));
     }
     UpdateShieldVisual();
+}
+
+void ATank::ActivateLightningBlast()
+{
+    if (bIsRespawning || !GetWorld() || LightningBlastCooldownRemaining > 0.0f)
+    {
+        return;
+    }
+
+    // Start cooldown immediately so repeated input cannot trigger multiple blasts.
+    LightningBlastCooldownRemaining = LightningBlastCooldown;
+
+    if (LightningBlastEffect)
+    {
+        UGameplayStatics::SpawnEmitterAtLocation(
+            GetWorld(), LightningBlastEffect, GetActorLocation(), GetActorRotation(), FVector::OneVector, true);
+    }
+
+    // Find nearby enemy turrets once and apply damage once per actor.
+    TArray<AActor*> OverlappingActors;
+    TArray<AActor*> ActorsToIgnore;
+    ActorsToIgnore.Add(this);
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), ABaseEnemyTurret::StaticClass(), OverlappingActors);
+
+    for (AActor* Enemy : OverlappingActors)
+    {
+        if (!IsValid(Enemy) || Enemy == this)
+        {
+            continue;
+        }
+
+        const float Distance = FVector::Dist(GetActorLocation(), Enemy->GetActorLocation());
+        if (Distance <= LightningBlastRadius)
+        {
+            UGameplayStatics::ApplyDamage(Enemy, LightningBlastDamage, GetController(), this, nullptr);
+        }
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("Player Lightning Blast: %.1f damage within %.1f radius. Cooldown %.1f seconds."),
+        LightningBlastDamage, LightningBlastRadius, LightningBlastCooldown);
 }
 
 void ATank::FireSecondaryRocket()

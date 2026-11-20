@@ -1,4 +1,4 @@
-﻿
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -40,5 +40,6 @@ private:
 	void OnBoostPressed();
 	void OnBoostReleased();
 	void OnShieldPressed();
+	void OnLightningBlastPressed();
 	void OnSecondaryRocketPressed();
 };

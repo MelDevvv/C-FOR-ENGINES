@@ -2,6 +2,7 @@
 
 #include "Components/ActorComponent.h"
 #include "Components/TextBlock.h"
+#include "Styling/SlateColor.h"
 #include "GameFramework/GameModeBase.h"
 #include "Engine/World.h"
 #include "UObject/UnrealType.h"
@@ -194,4 +195,7 @@ void UTimerWidget::UpdateText(double Seconds)
     // Exact Blueprint conversion: From Seconds -> As Timespan -> SetText(T_Timer).
     const FTimespan TimeSpan = FTimespan::FromSeconds(Seconds);
     T_Timer->SetText(FText::AsTimespan(TimeSpan));
+    T_Timer->SetColorAndOpacity(FSlateColor(Seconds <= 30.0 ? FLinearColor(1.0f,0.28f,0.2f,1.0f) : FLinearColor(0.78f,0.91f,1.0f,1.0f)));
+    FSlateFontInfo TimerFont = T_Timer->GetFont(); TimerFont.Size = 30; T_Timer->SetFont(TimerFont);
+    T_Timer->SetShadowOffset(FVector2D(2.0f,2.0f)); T_Timer->SetShadowColorAndOpacity(FLinearColor(0.0f,0.0f,0.0f,0.8f));
 }

@@ -1,4 +1,4 @@
-﻿
+
 #include "TankController.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -160,6 +160,7 @@ void ATankController::SetupInputComponent()
         &ATankController::OnBoostReleased);
 
     InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &ATankController::OnShieldPressed);
+    InputComponent->BindKey(EKeys::F, IE_Pressed, this, &ATankController::OnLightningBlastPressed);
     InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &ATankController::OnSecondaryRocketPressed);
 
     UE_LOG(LogTemp, Warning, TEXT("TankController input actions bound."));
@@ -227,6 +228,11 @@ void ATankController::OnBoostReleased()
 void ATankController::OnShieldPressed()
 {
     if (ATank* Tank = Cast<ATank>(GetPawn())) Tank->ActivateShieldAbility();
+}
+
+void ATankController::OnLightningBlastPressed()
+{
+    if (ATank* Tank = Cast<ATank>(GetPawn())) Tank->ActivateLightningBlast();
 }
 
 void ATankController::OnSecondaryRocketPressed()

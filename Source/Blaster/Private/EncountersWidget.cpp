@@ -2,6 +2,7 @@
 
 #include "EncounterManagerActor.h"
 #include "Components/TextBlock.h"
+#include "Styling/SlateColor.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
@@ -174,4 +175,7 @@ void UEncountersWidget::UpdateEncounterText()
         FText::AsNumber(TotalTargets));
 
     EncounterTextBlock->SetText(FormattedText);
+    EncounterTextBlock->SetColorAndOpacity(FSlateColor(FLinearColor(0.45f,0.82f,1.0f,1.0f)));
+    FSlateFontInfo EncounterFont = EncounterTextBlock->GetFont(); EncounterFont.Size = 18; EncounterTextBlock->SetFont(EncounterFont);
+    EncounterTextBlock->SetShadowOffset(FVector2D(1.5f,1.5f)); EncounterTextBlock->SetShadowColorAndOpacity(FLinearColor(0.0f,0.0f,0.0f,0.8f));
 }

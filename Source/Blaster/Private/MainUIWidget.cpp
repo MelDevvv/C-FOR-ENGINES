@@ -1,6 +1,7 @@
 #include "MainUIWidget.h"
 
 #include "Components/ProgressBar.h"
+#include "Components/TextBlock.h"
 
 void UMainUIWidget::NativeConstruct()
 
@@ -13,6 +14,8 @@ void UMainUIWidget::NativeConstruct()
 	{
 
 		HealthBar->SetPercent(1.0f);
+        HealthBar->SetFillColorAndOpacity(FLinearColor(0.12f, 0.82f, 0.45f, 1.0f));
+        HealthBar->SetIsMarquee(false);
 
 	}
 

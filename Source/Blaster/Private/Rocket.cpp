@@ -37,6 +37,15 @@ void ARocket::BeginPlay()
 
     CacheBlueprintComponents();
 
+    // Make the rocket's actor rotation follow its actual flight direction.
+    // This is especially important for homing rockets as they curve toward targets.
+    if (IsValid(CachedProjectileMovement))
+    {
+        CachedProjectileMovement->bRotationFollowsVelocity = true;
+        CachedProjectileMovement->bRotationRemainsVertical = false;
+    }
+
+
     if (!IsValid(CachedSphere))
     {
         UE_LOG(LogTemp, Error,
@@ -143,6 +152,8 @@ void ARocket::SetHomingTargetComponent(USceneComponent* TargetComponent, float H
         CachedProjectileMovement->HomingTargetComponent = TargetComponent;
         CachedProjectileMovement->HomingAccelerationMagnitude = HomingAcceleration;
         CachedProjectileMovement->bIsHomingProjectile = true;
+        CachedProjectileMovement->bRotationFollowsVelocity = true;
+        CachedProjectileMovement->bRotationRemainsVertical = false;
         CachedProjectileMovement->Activate(true);
     }
 }
