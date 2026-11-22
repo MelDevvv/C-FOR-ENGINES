@@ -22,13 +22,13 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Health") float MaxHealth = 50.0f;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Health") bool bIsInvulnerable = false;
 
-    // Original Blueprint dispatcher name and signature.
+    // original blueprint dispatcher name and signature
     UPROPERTY(BlueprintAssignable, Category="Health") FHealthModifiedSignature EHealthModified;
-    // Compatibility dispatcher used by existing native Tank code.
+    // compatibility dispatcher used by existing native tank code
     UPROPERTY(BlueprintAssignable, Category="Health") FHealthModifiedSignature OnHealthModified;
-    // Kept parameterless for existing native consumers such as ATank.
+    // kept parameterless for existing native consumers such as atank
     UPROPERTY(BlueprintAssignable, Category="Health") FDeathSignature OnDeath;
-    // Matches the original Blueprint EDeath(Controller, Actor) dispatcher.
+    // matches the original blueprint edeathcontroller actor dispatcher
     UPROPERTY(BlueprintAssignable, Category="Health") FDeathContextSignature EDeath;
     UPROPERTY(BlueprintAssignable, Category="Target") FTargetDestroyedSignature ETargetDestroyed;
 

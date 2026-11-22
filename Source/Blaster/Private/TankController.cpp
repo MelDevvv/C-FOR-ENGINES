@@ -146,7 +146,7 @@ void ATankController::SetupInputComponent()
             &ATankController::OnFire);
     }
 
-    // Boost is bound directly to Left Shift so no new Input Action asset is required.
+    // boost is bound directly to left shift so no new input action asset is required
     InputComponent->BindKey(
         EKeys::LeftShift,
         IE_Pressed,

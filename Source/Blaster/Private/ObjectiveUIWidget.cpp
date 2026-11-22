@@ -47,8 +47,8 @@ void UObjectiveUIWidget::AddRuleWidgets(const TArray<UObject*>& ActiveRules)
             continue;
         }
 
-        // The original Blueprint leaves OwningPlayer unconnected, so use
-        // the world-context CreateWidget overload rather than requiring a PC.
+        // the original blueprint leaves owningplayer unconnected so use
+        // the worldcontext createwidget overload rather than requiring a pc
         UUserWidget* RuleWidget = CreateWidget<UUserWidget>(GetWorld(), RuleWidgetClass);
         if (!IsValid(RuleWidget))
         {
@@ -63,7 +63,7 @@ void UObjectiveUIWidget::AddRuleWidgets(const TArray<UObject*>& ActiveRules)
         }
 
         ObjectivesPanel->AddChildToVerticalBox(RuleWidget);
-        // Presentation-only pass: keep rule widget logic/bindings untouched, improve typography.
+        // presentationonly pass keep rule widget logicbindings untouched improve typography
         TArray<UWidget*> RuleChildren; if (RuleWidget->WidgetTree) RuleWidget->WidgetTree->GetAllWidgets(RuleChildren);
         for (UWidget* Child : RuleChildren)
         {

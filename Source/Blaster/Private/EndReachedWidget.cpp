@@ -24,7 +24,7 @@ void UEndReachedWidget::NativeConstruct()
         T_Escape->SetShadowOffset(FVector2D(2.0f,2.0f)); T_Escape->SetShadowColorAndOpacity(FLinearColor(0.0f,0.0f,0.0f,0.8f));
     }
 
-    // It is hidden until the encounter manager confirms the final encounter is complete.
+    // it is hidden until the encounter manager confirms the final encounter is complete
     SetVisibility(ESlateVisibility::Collapsed);
 
     CachedEndPointActor = FindEndPointActor();
@@ -50,7 +50,7 @@ void UEndReachedWidget::NativeConstruct()
     {
         BindEncountersCompleted();
 
-        // Covers the case where this widget is created after the final encounter event.
+        // covers the case where this widget is created after the final encounter event
         if (HasManagerAlreadyCompletedAllEncounters(CachedEncounterManager))
         {
             ShowFindExit();
@@ -116,7 +116,7 @@ AActor* UEndReachedWidget::FindEncounterManagerActor() const
             continue;
         }
 
-        // Match the native manager and Blueprint manager by the dispatcher they expose.
+        // match the native manager and blueprint manager by the dispatcher they expose
         if (FindFProperty<FMulticastDelegateProperty>(Candidate->GetClass(), EncountersCompletedName))
         {
             return Candidate;
@@ -133,7 +133,7 @@ bool UEndReachedWidget::ReadEndPointAutoActivate() const
         return false;
     }
 
-    // The actual Blueprint variable is named bAutoActivate.
+    // the actual blueprint variable is named bautoactivate
     const FBoolProperty* Property = FindFProperty<FBoolProperty>(
         CachedEndPointActor->GetClass(), TEXT("bAutoActivate"));
 
@@ -211,7 +211,7 @@ bool UEndReachedWidget::BindEncountersCompleted()
         return false;
     }
 
-    // The converted manager dispatcher is EEncountersCompleted(int32, bool).
+    // the converted manager dispatcher is eencounterscompletedint32 bool
     int32 InputCount = 0;
     bool bHasInt = false;
     bool bHasBool = false;

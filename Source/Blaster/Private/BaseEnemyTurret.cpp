@@ -39,7 +39,7 @@ ABaseEnemyTurret::ABaseEnemyTurret()
     DetectionZoneVisualization->SetHiddenInGame(true);
     DetectionZoneVisualization->SetVisibility(true);
 
-    // This is the effect referenced by the original BP_BaseEnemyTurret asset.
+    // this is the effect referenced by the original bpbaseenemyturret asset
     static ConstructorHelpers::FObjectFinder<UParticleSystem> DeathEffectAsset(
         TEXT("/Game/Assets/Effects/PS_EnemyDeathExplosion.PS_EnemyDeathExplosion")
     );
@@ -99,8 +99,8 @@ void ABaseEnemyTurret::OnConstruction(const FTransform& Transform)
         DetectionZoneVisualization->SetVisibility(true);
     }
 
-    // Reproduce BP_BaseEnemyTurret's Construction Script:
-    // Health = MaxHP and DangerZone world scale = (Range, Range, 50).
+    // reproduce bpbaseenemyturrets construction script
+    // health maxhp and dangerzone world scale range range 50
     const float MaxHP = ReadBlueprintFloat(FName(TEXT("MaxHP")), 50.0f);
     const float Range = ReadBlueprintFloat(FName(TEXT("Range")), 1500.0f);
 
@@ -126,8 +126,8 @@ void ABaseEnemyTurret::BeginPlay()
     EnemyPatrolWaitRemaining = 0.0f;
     BuildEnemyNavigationPath(EnemyPatrolTarget);
 
-    // BP_BaseEnemyTurret originally waited a random 0.0-0.9 seconds,
-    // then started a repeating timer using its FireRate Blueprint variable.
+    // bpbaseenemyturret originally waited a random 0009 seconds
+    // then started a repeating timer using its firerate blueprint variable
     const float FireRate = FMath::Max(
         0.05f,
         ReadBlueprintFloat(FName(TEXT("FireRate")), 1.0f)
@@ -153,17 +153,17 @@ void ABaseEnemyTurret::Tick(float DeltaTime)
         FindPlayerTank();
     }
 
-    // Run recoil/timeline transforms first. RocketShake writes the TurretSpin
-    // relative rotation each frame; if aim runs before it, that write can
-    // overwrite the freshly calculated target rotation.
+    // run recoiltimeline transforms first rocketshake writes the turretspin
+    // relative rotation each frame if aim runs before it that write can
+    // overwrite the freshly calculated target rotation
     UpdateNativeMachineGunShake(DeltaTime);
     UpdateNativeLightningAttack(DeltaTime);
     UpdateNativeRocketShake(DeltaTime);
     UpdateEnemyMovementAI(DeltaTime);
 
-    // Aim last so the final transform for this frame always faces the player.
-    // The child Arrow/Arrow1 launch points inherit this rotation, so rockets
-    // use the same yaw direction as the turret.
+    // aim last so the final transform for this frame always faces the player
+    // the child arrowarrow1 launch points inherit this rotation so rockets
+    // use the same yaw direction as the turret
     UpdateTurretAim();
 }
 
@@ -212,8 +212,8 @@ void ABaseEnemyTurret::CacheBlueprintComponents()
             *GetName());
     }
 
-    // Preserve and locate the two authored charge particle components from
-    // BP_Enemy_Lightning. They remain Blueprint-owned; C++ only drives params.
+    // preserve and locate the two authored charge particle components from
+    // bpenemylightning they remain blueprintowned c only drives params
     TArray<UParticleSystemComponent*> ParticleComponents;
     GetComponents<UParticleSystemComponent>(ParticleComponents);
     for (UParticleSystemComponent* ParticleComponent : ParticleComponents)
@@ -233,8 +233,8 @@ void ABaseEnemyTurret::CacheBlueprintComponents()
         }
     }
 
-    // The native component is created in the C++ constructor. The legacy
-    // Blueprint component is optional and is no longer required for damage.
+    // the native component is created in the c constructor the legacy
+    // blueprint component is optional and is no longer required for damage
 }
 
 void ABaseEnemyTurret::InitialiseNativeHealthComponent()
@@ -245,14 +245,14 @@ void ABaseEnemyTurret::InitialiseNativeHealthComponent()
         return;
     }
 
-    // Keep the existing BP_BaseEnemyTurret MaxHP value as the tuning source,
-    // but all damage/death behaviour now lives in UHealthComponent.
+    // keep the existing bpbaseenemyturret maxhp value as the tuning source
+    // but all damagedeath behaviour now lives in uhealthcomponent
     const float ConfiguredMaxHP = FMath::Max(1.0f, ReadBlueprintFloat(FName(TEXT("MaxHP")), 50.0f));
     NativeHealthComponent->MaxHealth = ConfiguredMaxHP;
     NativeHealthComponent->ResetHealth();
-    // EDeath is the canonical original Blueprint event. OnDeath remains
-    // available for existing native consumers, but binding both here would
-    // spawn the enemy death effect twice.
+    // edeath is the canonical original blueprint event ondeath remains
+    // available for existing native consumers but binding both here would
+    // spawn the enemy death effect twice
     NativeHealthComponent->EDeath.AddUniqueDynamic(this, &ABaseEnemyTurret::HandleHealthDeathWithContext);
 
     UE_LOG(LogTemp, Log, TEXT("%s: Native health ready. MaxHealth=%.1f"), *GetName(), ConfiguredMaxHP);
@@ -262,14 +262,14 @@ void ABaseEnemyTurret::FindPlayerTank()
 {
     AActor* FoundTarget = nullptr;
 
-    // Prefer a valid TankREF assigned by the existing Blueprint/gameplay.
+    // prefer a valid tankref assigned by the existing blueprintgameplay
     if (UObject* ExistingReference = ReadBlueprintObject(FName(TEXT("TankREF"))))
     {
         FoundTarget = Cast<AActor>(ExistingReference);
     }
 
-    // Resolve the possessed pawn (not just a Character) so targeting works
-    // regardless of the exact player pawn subclass.
+    // resolve the possessed pawn not just a character so targeting works
+    // regardless of the exact player pawn subclass
     if (!IsValid(FoundTarget))
     {
         FoundTarget = UGameplayStatics::GetPlayerPawn(this, 0);
@@ -279,7 +279,7 @@ void ABaseEnemyTurret::FindPlayerTank()
         FoundTarget = UGameplayStatics::GetPlayerCharacter(this, 0);
     }
 
-    // Fallback for a tank that exists in the level but is not possessed yet.
+    // fallback for a tank that exists in the level but is not possessed yet
     if (!IsValid(FoundTarget) && GetWorld())
     {
         TArray<AActor*> FoundActors;
@@ -328,7 +328,7 @@ bool ABaseEnemyTurret::TryEnemyDodgeIncomingProjectile()
     UGameplayStatics::GetAllActorsWithTag(GetWorld(), FName(TEXT("PlayerProjectile")), Actors);
     if (Actors.IsEmpty())
     {
-        // Fallback: inspect actors with ProjectileMovement; avoids requiring a tag.
+        // fallback inspect actors with projectilemovement avoids requiring a tag
         UGameplayStatics::GetAllActorsOfClass(GetWorld(), AActor::StaticClass(), Actors);
     }
 
@@ -494,7 +494,7 @@ void ABaseEnemyTurret::UpdateEnemyMovementAI(float DeltaTime)
             }
             if (!MoveEnemyAlongNavigationPath(EnemyDodgeSpeed, DeltaTime))
             {
-                // If navigation cannot reach the dodge point, try a short collision-swept sidestep.
+                // if navigation cannot reach the dodge point try a short collisionswept sidestep
                 FVector Side = (EnemyDodgeTarget - GetActorLocation()).GetSafeNormal2D();
                 if (!Side.IsNearlyZero())
                 {
@@ -521,8 +521,8 @@ void ABaseEnemyTurret::UpdateEnemyMovementAI(float DeltaTime)
         bEnemyHasLastKnownPlayerLocation = true;
         EnemyLostPlayerSearchRemaining = EnemySearchDuration;
 
-        // If the player is retreating beyond close combat distance, pursue their
-        // live position. Do not let a random lateral combat target stall pursuit.
+        // if the player is retreating beyond close combat distance pursue their
+        // live position do not let a random lateral combat target stall pursuit
         if (PlayerDistance > 1100.0f)
         {
             EnemyPatrolWaitRemaining = 0.0f;
@@ -533,7 +533,7 @@ void ABaseEnemyTurret::UpdateEnemyMovementAI(float DeltaTime)
             }
             if (!MoveEnemyAlongNavigationPath(EnemyChaseSpeed, DeltaTime))
             {
-                // Navigation fallback: collision-swept movement toward the tank.
+                // navigation fallback collisionswept movement toward the tank
                 FVector ChaseDirection = (CachedTank->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
                 FHitResult ChaseHit;
                 AddActorWorldOffset(ChaseDirection * EnemyChaseSpeed * DeltaTime, true, &ChaseHit);
@@ -545,7 +545,7 @@ void ABaseEnemyTurret::UpdateEnemyMovementAI(float DeltaTime)
             return;
         }
 
-        // Close combat: keep moving laterally and reposition instead of stopping.
+        // close combat keep moving laterally and reposition instead of stopping
         EnemyPatrolWaitRemaining = 0.0f;
         if (!bEnemyCombatMoveTargetValid || EnemyCombatMoveRemaining <= 0.0f || EnemyCachedPathPoints.IsEmpty())
         {
@@ -571,8 +571,8 @@ void ABaseEnemyTurret::UpdateEnemyMovementAI(float DeltaTime)
         return;
     }
 
-    // If the player escaped the detection radius, pursue the last seen position
-    // for a short search period, then sweep nearby points before resuming patrol.
+    // if the player escaped the detection radius pursue the last seen position
+    // for a short search period then sweep nearby points before resuming patrol
     if (bEnemyHasLastKnownPlayerLocation && EnemyLostPlayerSearchRemaining > 0.0f)
     {
         EnemyLostPlayerSearchRemaining = FMath::Max(0.0f, EnemyLostPlayerSearchRemaining - DeltaTime);
@@ -583,7 +583,7 @@ void ABaseEnemyTurret::UpdateEnemyMovementAI(float DeltaTime)
         }
         if (!MoveEnemyAlongNavigationPath(EnemyChaseSpeed, DeltaTime))
         {
-            // Reached or couldn't reach last known position; search locally.
+            // reached or couldnt reach last known position search locally
             EnemyPatrolOrigin = EnemyLastKnownPlayerLocation;
             bEnemyPatrolOriginSet = true;
             bEnemyPatrolTargetValid = false;
@@ -615,7 +615,7 @@ void ABaseEnemyTurret::UpdateEnemyMovementAI(float DeltaTime)
 
     if (!MoveEnemyAlongNavigationPath(EnemyPatrolSpeed, DeltaTime))
     {
-        // Fallback patrol movement so AI still starts moving if a nav query fails.
+        // fallback patrol movement so ai still starts moving if a nav query fails
         FVector PatrolDirection = (EnemyPatrolTarget - GetActorLocation()).GetSafeNormal2D();
         FHitResult PatrolHit;
         AddActorWorldOffset(PatrolDirection * EnemyPatrolSpeed * DeltaTime, true, &PatrolHit);
@@ -659,8 +659,8 @@ void ABaseEnemyTurret::UpdateTurretAim()
     const FRotator SmoothedRotation = FMath::RInterpTo(
         CurrentWorldRotation, DesiredWorldRotation, DeltaSeconds, 4.0f);
 
-    // Always apply the aim after recoil updates in Tick. The launch arrows are
-    // children of the rotating turret assembly and inherit this world yaw.
+    // always apply the aim after recoil updates in tick the launch arrows are
+    // children of the rotating turret assembly and inherit this world yaw
     CachedTurretSpin->SetWorldRotation(SmoothedRotation);
 }
 
@@ -676,17 +676,17 @@ void ABaseEnemyTurret::FireCheck()
         return;
     }
 
-    // Separate awareness radius from weapon range: enemies only start firing
-    // when the player is within the shorter AI detection radius.
+    // separate awareness radius from weapon range enemies only start firing
+    // when the player is within the shorter ai detection radius
     if (FVector::DistSquared(GetActorLocation(), CachedTank->GetActorLocation()) >
         FMath::Square(EnemyDetectionRadius))
     {
         return;
     }
 
-    // Reproduce the base Blueprint's Multi Sphere Trace By Channel:
-    // Start = ActorLocation, End = ActorLocation + (0,0,1),
-    // Radius = Range, Trace Channel = custom Player channel, Ignore Self.
+    // reproduce the base blueprints multi sphere trace by channel
+    // start actorlocation end actorlocation 001
+    // radius range trace channel custom player channel ignore self
     const float Range = FMath::Max(
         0.0f,
         ReadBlueprintFloat(FName(TEXT("Range")), 1500.0f)
@@ -709,7 +709,7 @@ void ABaseEnemyTurret::FireCheck()
 
     TArray<FHitResult> Hits;
 
-    // ECC_GameTraceChannel1 is named "Player" in this project's DefaultEngine.ini.
+    // eccgametracechannel1 is named player in this projects defaultengineini
     const bool bAnyHit = GetWorld()->SweepMultiByChannel(
         Hits,
         Start,
@@ -725,7 +725,7 @@ void ABaseEnemyTurret::FireCheck()
         return;
     }
 
-    // Only fire the child weapon when the detected actor is the player tank.
+    // only fire the child weapon when the detected actor is the player tank
     const bool bPlayerTankHit = Hits.ContainsByPredicate(
         [this](const FHitResult& Hit)
         {
@@ -762,11 +762,11 @@ void ABaseEnemyTurret::UpdateNativeMachineGunShake(float DeltaTime)
     MachineGunShakeElapsed = FMath::Min(MachineGunShakeElapsed + DeltaTime, 5.0f);
     const float Alpha = FMath::Clamp(MachineGunShakeElapsed / 5.0f, 0.0f, 1.0f);
 
-    // The exported GunShake track is 0 -> -2 -> 0. Apply the motion to the
-    // authored pivot location instead of replacing its component transform.
+    // the exported gunshake track is 0 2 0 apply the motion to the
+    // authored pivot location instead of replacing its component transform
     const float TurretMovement = -2.0f * FMath::Sin(PI * Alpha);
-    // Keep the authored pivot centred. The old conversion added a constant
-    // +7 units on Y, which displaced the turret throughout repeated firing.
+    // keep the authored pivot centred the old conversion added a constant
+    // 7 units on y which displaced the turret throughout repeated firing
     const FVector ShakeOffset(0.0f, 0.0f, TurretMovement);
 
     CachedTurretSpin->SetRelativeLocation(
@@ -823,8 +823,8 @@ void ABaseEnemyTurret::ExecuteNativeMachineGunFire()
 
     FHitResult Hit;
 
-    // A small sphere sweep is more forgiving than a zero-width line and helps
-    // the trace catch the tank's central collision body.
+    // a small sphere sweep is more forgiving than a zerowidth line and helps
+    // the trace catch the tanks central collision body
     constexpr float TraceRadius = 18.0f;
     const bool bHit = GetWorld()->SweepSingleByChannel(
         Hit,
@@ -844,8 +844,8 @@ void ABaseEnemyTurret::ExecuteNativeMachineGunFire()
             Hit.GetActor(), 1.0f, GetInstigatorController(), this, nullptr
         );
 
-        // Play the impact burst at the actual contact point, not at the
-        // far endpoint of the trace. Orient it along the surface normal.
+        // play the impact burst at the actual contact point not at the
+        // far endpoint of the trace orient it along the surface normal
         if (MachineGunMissEffect)
         {
             const FRotator ImpactRotation =
@@ -876,7 +876,7 @@ void ABaseEnemyTurret::ExecuteNativeMachineGunFire()
 
     if (!bHit && MachineGunMissEffect)
     {
-        // Preserve the original end-of-trace effect for a genuine miss.
+        // preserve the original endoftrace effect for a genuine miss
         UGameplayStatics::SpawnEmitterAtLocation(
             GetWorld(), MachineGunMissEffect, End, FRotator::ZeroRotator,
             FVector(0.25f), true
@@ -899,8 +899,8 @@ void ABaseEnemyTurret::UpdateNativeLightningAttack(float DeltaTime)
     const float Buildup = FMath::Sin(PI * Alpha);
     const float TurretMovement = -2.0f * Buildup;
 
-    // The exported Blueprint timeline drives LT1/LT2 from a 0..1 buildup
-    // track (multipliers 40 and 300) and offsets the turret pivot while firing.
+    // the exported blueprint timeline drives lt1lt2 from a 01 buildup
+    // track multipliers 40 and 300 and offsets the turret pivot while firing
     if (IsValid(CachedLightningCharge))
     {
         CachedLightningCharge->SetFloatParameter(FName(TEXT("LT1")), Buildup * 40.0f);
@@ -914,11 +914,11 @@ void ABaseEnemyTurret::UpdateNativeLightningAttack(float DeltaTime)
 
     if (IsValid(CachedTurretSpin))
     {
-        // Match the original BP_Enemy_Lightning graph exactly: the
-        // SetRelativeLocationAndRotation node writes X=0, Y=0 and
-        // Z=(TurretMovement * 5) + 7. It does NOT add that offset to the
-        // component's existing relative location. Adding it to the authored
-        // transform caused the whole turret to sit too high above its base.
+        // match the original bpenemylightning graph exactly the
+        // setrelativelocationandrotation node writes x0 y0 and
+        // zturretmovement 5 7 it does not add that offset to the
+        // components existing relative location adding it to the authored
+        // transform caused the whole turret to sit too high above its base
         const FVector OriginalBlueprintRelativeLocation(
             0.0f, 0.0f, (TurretMovement * 5.0f) + 7.0f);
 
@@ -955,8 +955,8 @@ void ABaseEnemyTurret::ExecuteNativeLightningFire()
         return;
     }
 
-    // Match the authored Blueprint: blast at the turret, sphere trace for
-    // Pawn objects using Range, then apply 5 damage and attach the hit burst.
+    // match the authored blueprint blast at the turret sphere trace for
+    // pawn objects using range then apply 5 damage and attach the hit burst
     if (LightningBlastEffect)
     {
         UGameplayStatics::SpawnEmitterAtLocation(
@@ -1054,9 +1054,9 @@ void ABaseEnemyTurret::ExecuteNativeRocketFire()
         return;
     }
 
-    // The original Blueprint alternates launch points using Point:
-    // Point=false launches from Arrow1 and sets Point=true;
-    // Point=true launches from Arrow and sets Point=false.
+    // the original blueprint alternates launch points using point
+    // pointfalse launches from arrow1 and sets pointtrue
+    // pointtrue launches from arrow and sets pointfalse
     WriteBlueprintBool(FName(TEXT("Point")), !bUseArrow0);
 
     FVector AimTarget = IsValid(CachedTank) ? CachedTank->GetActorLocation() : GetActorLocation();
@@ -1065,8 +1065,8 @@ void ABaseEnemyTurret::ExecuteNativeRocketFire()
     const FVector SpawnLocation = LaunchArrow->GetComponentLocation();
     const FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(SpawnLocation, AimTarget);
 
-    // The Blueprint takes Roll and Yaw from the Arrow's world rotation,
-    // but takes Pitch from Find Look at Rotation.
+    // the blueprint takes roll and yaw from the arrows world rotation
+    // but takes pitch from find look at rotation
     FRotator SpawnRotation = LaunchArrow->GetComponentRotation();
     SpawnRotation.Pitch = LookAtRotation.Pitch;
 
@@ -1080,9 +1080,9 @@ void ABaseEnemyTurret::ExecuteNativeRocketFire()
         FTransform(SpawnRotation, SpawnLocation, FVector::OneVector),
         SpawnParams);
 
-    // BP_Rocket owns the ProjectileMovement component. Enable Unreal's native
-    // homing on the spawned instance so the projectile steers after launch,
-    // while preserving the Blueprint's original speed, gravity and overlap logic.
+    // bprocket owns the projectilemovement component enable unreals native
+    // homing on the spawned instance so the projectile steers after launch
+    // while preserving the blueprints original speed gravity and overlap logic
     AActor* HomingTarget = IsValid(CachedTank) ? Cast<AActor>(CachedTank) : nullptr;
     if (IsValid(SpawnedRocket) && IsValid(HomingTarget))
     {
@@ -1113,9 +1113,9 @@ void ABaseEnemyTurret::ExecuteNativeRocketFire()
         UE_LOG(LogTemp, Warning, TEXT("%s: Rocket spawned without homing because no valid TankREF target was available."), *GetName());
     }
 
-    // The child Blueprint starts the two authored timelines after spawning.
-    // The toggled Point selects which of the two rocket-rig meshes receives
-    // its short recoil animation.
+    // the child blueprint starts the two authored timelines after spawning
+    // the toggled point selects which of the two rocketrig meshes receives
+    // its short recoil animation
     RocketShakeElapsed = 0.0f;
     bRocketShakeActive = true;
 }
@@ -1132,25 +1132,25 @@ void ABaseEnemyTurret::UpdateNativeRocketShake(float DeltaTime)
     RocketShakeElapsed = FMath::Min(RocketShakeElapsed + DeltaTime, 5.0f);
     const float Alpha = FMath::Clamp(RocketShakeElapsed / 5.0f, 0.0f, 1.0f);
 
-    // Exported RocketShake/GunShake timelines are 5 seconds long. The visible
-    // track has a 0 -> -2 -> 0 recoil shape; use a smooth half-wave between
-    // those endpoints to reproduce the authored movement without Blueprint timelines.
+    // exported rocketshakegunshake timelines are 5 seconds long the visible
+    // track has a 0 2 0 recoil shape use a smooth halfwave between
+    // those endpoints to reproduce the authored movement without blueprint timelines
     const float TrackValue = -2.0f * FMath::Sin(PI * Alpha);
 
     if (IsValid(CachedTurretSpin))
     {
         const FVector OriginalGraphLocation(0.0f, 0.0f, TrackValue + 7.0f);
         const float ExistingYaw = CachedTurretSpin->GetRelativeRotation().Yaw;
-        // FRotator constructor order is Pitch, Yaw, Roll.
-        // The original Blueprint sets Roll=0, Pitch=(0 - TurretMovement),
-        // and preserves RelativeRotation.Yaw. Do not put yaw in the Roll slot.
+        // frotator constructor order is pitch yaw roll
+        // the original blueprint sets roll0 pitch0 turretmovement
+        // and preserves relativerotationyaw do not put yaw in the roll slot
         const FRotator OriginalGraphRotation(-TrackValue, ExistingYaw, 0.0f);
         CachedTurretSpin->SetRelativeLocationAndRotation(
             OriginalGraphLocation, OriginalGraphRotation);
     }
 
-    // After Point is toggled by Turret Fire, true drives StaticMesh_0
-    // (RocketShake); false drives StaticMesh1 (Timeline_0).
+    // after point is toggled by turret fire true drives staticmesh0
+    // rocketshake false drives staticmesh1 timeline0
     const bool bUseMesh0 = ReadBlueprintBool(FName(TEXT("Point")), false);
     USceneComponent* RecoilMesh = bUseMesh0 ? CachedRocketMesh0 : CachedRocketMesh1;
     if (IsValid(RecoilMesh))
@@ -1164,7 +1164,7 @@ void ABaseEnemyTurret::UpdateNativeRocketShake(float DeltaTime)
         if (IsValid(CachedTurretSpin))
         {
             const float ExistingYaw = CachedTurretSpin->GetRelativeRotation().Yaw;
-            // Reset pitch and roll while retaining yaw in FRotator's Yaw slot.
+            // reset pitch and roll while retaining yaw in frotators yaw slot
             CachedTurretSpin->SetRelativeLocationAndRotation(
                 FVector(0.0f, 0.0f, 7.0f),
                 FRotator(0.0f, ExistingYaw, 0.0f));
@@ -1198,10 +1198,10 @@ void ABaseEnemyTurret::ExecuteChildTurretFire()
         return;
     }
 
-    // Turret Fire is deliberately retained as a Blueprint function in
-    // BP_BaseEnemyTurret. Each child Blueprint overrides it with its own
-    // weapon (Machine Gun line trace, Lightning effects, or BP_Rocket spawn).
-    // Reflection calls the most-derived Blueprint implementation.
+    // turret fire is deliberately retained as a blueprint function in
+    // bpbaseenemyturret each child blueprint overrides it with its own
+    // weapon machine gun line trace lightning effects or bprocket spawn
+    // reflection calls the mostderived blueprint implementation
     const FName CandidateFunctionNames[] =
     {
         FName(TEXT("TurretFire")),
@@ -1245,8 +1245,8 @@ void ABaseEnemyTurret::HandleHealthDeathWithContext(
     AActor* DamageCauser
 )
 {
-    // The original Blueprint TurretDestroyed event receives these two values.
-    // Its current logic only plays the death effect and destroys this actor.
+    // the original blueprint turretdestroyed event receives these two values
+    // its current logic only plays the death effect and destroys this actor
     HandleHealthDeath();
 }
 

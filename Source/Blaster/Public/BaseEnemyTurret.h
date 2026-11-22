@@ -38,8 +38,8 @@ protected:
     TObjectPtr<UParticleSystem> NativeDeathEffect;
 
 private:
-    // Cached Blueprint SCS components. Names are intentionally different from
-    // the component variables in BP_BaseEnemyTurret to avoid property clashes.
+    // cached blueprint scs components names are intentionally different from
+    // the component variables in bpbaseenemyturret to avoid property clashes
     UPROPERTY(Transient)
     TObjectPtr<USceneComponent> CachedTurretSpin;
 
@@ -49,7 +49,7 @@ private:
     UPROPERTY(VisibleAnywhere, Category = "Enemy|AI|Detection Zone")
     TObjectPtr<USphereComponent> DetectionZoneVisualization;
 
-    // Native health component used by the previously working enemy damage path.
+    // native health component used by the previously working enemy damage path
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Enemy|Health", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UHealthComponent> NativeHealthComponent;
 
@@ -109,7 +109,7 @@ private:
     FTimerHandle FireTimerHandle;
 
 
-    // Shared movement AI inherited by all enemy child types.
+    // shared movement ai inherited by all enemy child types
     FVector EnemyPatrolOrigin = FVector::ZeroVector;
     FVector EnemyPatrolTarget = FVector::ZeroVector;
     FVector EnemyDodgeTarget = FVector::ZeroVector;
@@ -194,7 +194,7 @@ private:
     UFUNCTION()
     void HandleHealthDeath();
 
-    // Legacy BPC_HealthComponent.EDeath signature: (Controller, Actor).
+    // legacy bpchealthcomponentedeath signature controller actor
     UFUNCTION()
     void HandleHealthDeathWithContext(AController* InstigatedBy, AActor* DamageCauser);
 };

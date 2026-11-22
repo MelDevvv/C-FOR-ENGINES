@@ -17,7 +17,7 @@ void UBaseGameRule::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Keep BP_EncounterRule parented to BPC_BaseGameRule; bind its manager in C++.
+    // keep bpencounterrule parented to bpcbasegamerule bind its manager in c
     if (IsEncounterRuleBlueprint())
     {
         TryBindEncounterManager();
@@ -52,7 +52,7 @@ void UBaseGameRule::InitRule_Implementation(int32 InRuleID)
     RuleID = InRuleID;
     Completed = false;
 
-    // Timer setup is independent of the Encounter Rule binding.
+    // timer setup is independent of the encounter rule binding
     ClearNativeTimerHandles();
     bNativeTimerRule = false;
     bNativeTimerCompleted = false;
@@ -64,13 +64,13 @@ void UBaseGameRule::InitRule_Implementation(int32 InRuleID)
         const float InitialSeconds =
             FMath::Max(0.0f, ReadBlueprintTimerLength());
 
-        // Main one-shot timer.
+        // main oneshot timer
         if (InitialSeconds > 0.0f)
         {
             StartNativeTimer(InitialSeconds);
         }
 
-        // One-second repeating timer check.
+        // onesecond repeating timer check
         if (UWorld* World = GetWorld())
         {
             World->GetTimerManager().SetTimer(
@@ -171,7 +171,7 @@ bool UBaseGameRule::HasBlueprintTimerContract() const
         return false;
     }
 
-    // WBP_Timer uses a Double parameter for ETimerTicked.
+    // wbptimer uses a double parameter for etimerticked
     UFunction* Signature = TickedProperty->SignatureFunction.Get();
 
     int32 InputCount = 0;
@@ -250,7 +250,7 @@ void UBaseGameRule::NativeTimerCheck()
 
     if (Remaining > 0.0f)
     {
-        // Send remaining seconds as a Double to WBP_Timer.
+        // send remaining seconds as a double to wbptimer
         BroadcastBlueprintTimerDispatcher(
             TEXT("ETimerTicked"),
             true,
@@ -286,7 +286,7 @@ void UBaseGameRule::NativeTimerExpired()
         World->GetTimerManager().ClearTimer(NativeRuleTimerHandle);
     }
 
-    // WBP_Timer updates its display to zero.
+    // wbptimer updates its display to zero
     BroadcastBlueprintTimerDispatcher(TEXT("ETimerCompleted"));
 
     UE_LOG(
@@ -296,7 +296,7 @@ void UBaseGameRule::NativeTimerExpired()
         RuleID
     );
 
-    // GameMode failure path restarts the level.
+    // gamemode failure path restarts the level
     CompleteRule(false);
 }
 
@@ -439,7 +439,7 @@ bool UBaseGameRule::BroadcastBlueprintTimerDispatcher(
         return false;
     }
 
-    // UE 5.8: invoke the multicast script delegate through ProcessDelegate.
+    // ue 58 invoke the multicast script delegate through processdelegate
     Delegate->ProcessDelegate<UObject>(
         Parameters.GetStructMemory()
     );

@@ -18,7 +18,7 @@ public:
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
-    // Runtime reference to the BP_EndPoint actor found during InitRule.
+    // runtime reference to the bpendpoint actor found during initrule
     UPROPERTY(Transient)
     TObjectPtr<AActor> CachedEndPoint = nullptr;
 

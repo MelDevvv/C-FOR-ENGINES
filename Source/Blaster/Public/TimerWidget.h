@@ -16,7 +16,7 @@ protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
 
-    // Must match the existing Designer TextBlock name.
+    // must match the existing designer textblock name
     UPROPERTY(meta = (BindWidget))
     TObjectPtr<UTextBlock> T_Timer;
 
@@ -41,7 +41,7 @@ protected:
     FScriptDelegate CompletedDelegate;
 
 public:
-    // Native equivalent of the Blueprint UpdateText(Seconds) function.
+    // native equivalent of the blueprint updatetextseconds function
     UFUNCTION(BlueprintCallable, Category = "Timer")
     void UpdateText(double Seconds);
 };

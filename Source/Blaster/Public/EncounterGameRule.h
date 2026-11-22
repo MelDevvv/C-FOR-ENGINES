@@ -21,7 +21,7 @@ public:
 
 protected:
 
-	// Uses the EncounterManager inherited from UBaseGameRule.
+	// uses the encountermanager inherited from ubasegamerule
 
 	UFUNCTION()
 	void HandleAllEncountersCompleted(int32 CompletedRuleID, bool bSuccessful);

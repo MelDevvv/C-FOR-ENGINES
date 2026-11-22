@@ -20,23 +20,23 @@ public:
 
 	AEndPointActor();
 
-	// Whether the endpoint starts activated.
+	// whether the endpoint starts activated
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Endpoint")
 	bool bAutoActivate = true;
 
-	// Endpoint trigger sphere.
+	// endpoint trigger sphere
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Endpoint")
 	TObjectPtr<USphereComponent> Sphere;
 
-	// Visual endpoint mesh.
+	// visual endpoint mesh
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Endpoint")
 	TObjectPtr<UStaticMeshComponent> StaticMesh;
 
-	// Broadcast when the player reaches the endpoint.
+	// broadcast when the player reaches the endpoint
 	UPROPERTY(BlueprintAssignable, Category = "Endpoint|Events")
 	FEndPointEvent EEndReached;
 
-	// Broadcast when the endpoint becomes active.
+	// broadcast when the endpoint becomes active
 	UPROPERTY(BlueprintAssignable, Category = "Endpoint|Events")
 	FEndPointEvent EEndActivated;
 

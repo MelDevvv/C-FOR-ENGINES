@@ -37,8 +37,8 @@ void ARocket::BeginPlay()
 
     CacheBlueprintComponents();
 
-    // Make the rocket's actor rotation follow its actual flight direction.
-    // This is especially important for homing rockets as they curve toward targets.
+    // make the rockets actor rotation follow its actual flight direction
+    // this is especially important for homing rockets as they curve toward targets
     if (IsValid(CachedProjectileMovement))
     {
         CachedProjectileMovement->bRotationFollowsVelocity = true;
@@ -54,8 +54,8 @@ void ARocket::BeginPlay()
         return;
     }
 
-    // Preserve the Blueprint Sphere's collision profile and authored settings.
-    // Only bind the native equivalent of OnComponentBeginOverlap.
+    // preserve the blueprint spheres collision profile and authored settings
+    // only bind the native equivalent of oncomponentbeginoverlap
     CachedSphere->OnComponentBeginOverlap.AddUniqueDynamic(
         this, &ARocket::HandleSphereBeginOverlap);
 }
@@ -124,7 +124,7 @@ void ARocket::HandleSphereBeginOverlap(
         return;
     }
 
-    // A player-fired rocket should ignore its owner and seek enemy turrets.
+    // a playerfired rocket should ignore its owner and seek enemy turrets
     if (OtherActor == GetOwner() || OtherActor == GetInstigator())
     {
         return;
@@ -184,7 +184,7 @@ void ARocket::HandleImpact(AActor* OverlapActor)
     AActor* DamageTarget = nullptr;
     if (Cast<ATank>(GetOwner()) || Cast<ATank>(GetInstigator()))
     {
-        // Player-fired rockets target enemy turret actors rather than the Player trace channel.
+        // playerfired rockets target enemy turret actors rather than the player trace channel
         FCollisionObjectQueryParams ObjectParams;
         ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
         ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
@@ -206,7 +206,7 @@ void ARocket::HandleImpact(AActor* OverlapActor)
     }
     else
     {
-        // Enemy-fired rockets retain the original Blueprint Player trace.
+        // enemyfired rockets retain the original blueprint player trace
         const ECollisionChannel TraceChannel = UEngineTypes::ConvertToCollisionChannel(ETraceTypeQuery::TraceTypeQuery3);
         FHitResult Hit;
         const bool bHit = GetWorld()->SweepSingleByChannel(Hit, TraceStart, TraceEnd,
@@ -216,13 +216,13 @@ void ARocket::HandleImpact(AActor* OverlapActor)
 
     if (IsValid(DamageTarget))
     {
-        // Keep the original rocket damage against the player, but deal 50 damage to enemies.
+        // keep the original rocket damage against the player but deal 50 damage to enemies
         const float DamageToApply = Cast<ABaseEnemyTurret>(DamageTarget) ? 50.0f : ImpactDamage;
         UGameplayStatics::ApplyDamage(DamageTarget, DamageToApply, GetInstigatorController(), this, nullptr);
     }
 
-    // The original graph always spawns the explosion and destroys the rocket
-    // after the trace/damage sequence, including when the trace misses.
+    // the original graph always spawns the explosion and destroys the rocket
+    // after the tracedamage sequence including when the trace misses
     if (ExplosionEffect)
     {
         UGameplayStatics::SpawnEmitterAtLocation(

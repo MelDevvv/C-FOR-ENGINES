@@ -17,9 +17,9 @@ void UTimerWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
-    // The original EventGraph explicitly sets:
-    // Not Hit Testable (Self & All Children).
-    // This must happen even if timer-rule lookup fails.
+    // the original eventgraph explicitly sets
+    // not hit testable self all children
+    // this must happen even if timerrule lookup fails
     SetVisibility(ESlateVisibility::HitTestInvisible);
 
     UE_LOG(LogTemp, Warning, TEXT("WBP_Timer native construct. TextBlock=%s"),
@@ -37,7 +37,7 @@ void UTimerWidget::NativeConstruct()
         return;
     }
 
-    // Match Blueprint Get Game Mode -> Get Component by Class.
+    // match blueprint get game mode get component by class
     AGameModeBase* GameMode = GetWorld()->GetAuthGameMode();
     if (!GameMode)
     {
@@ -63,12 +63,12 @@ void UTimerWidget::NativeConstruct()
     UE_LOG(LogTemp, Warning, TEXT("WBP_Timer: Found timer component %s"),
         *TimerRuleComponent->GetClass()->GetName());
 
-    // Match the three Blueprint Bind Event nodes, in their original order.
+    // match the three blueprint bind event nodes in their original order
     BindTimerDispatcher(TEXT("ETimerStarted"), GET_FUNCTION_NAME_CHECKED(UTimerWidget, HandleTimerStarted));
     BindTimerDispatcher(TEXT("ETimerTicked"), GET_FUNCTION_NAME_CHECKED(UTimerWidget, HandleTimerTicked));
     BindTimerDispatcher(TEXT("ETimerCompleted"), GET_FUNCTION_NAME_CHECKED(UTimerWidget, HandleTimerCompleted));
 
-    // Match the original EventGraph's initial UpdateText(TimerLength).
+    // match the original eventgraphs initial updatetexttimerlength
     UpdateText(ReadTimerLength());
 }
 
@@ -86,7 +86,7 @@ void UTimerWidget::HandleTimerStarted()
 
 void UTimerWidget::HandleTimerTicked(double TimeRemaining)
 {
-    // Original graph rounds TimeRemaining before calling UpdateText.
+    // original graph rounds timeremaining before calling updatetext
     UpdateText(static_cast<double>(FMath::RoundToInt(TimeRemaining)));
 }
 
@@ -192,7 +192,7 @@ void UTimerWidget::UpdateText(double Seconds)
         return;
     }
 
-    // Exact Blueprint conversion: From Seconds -> As Timespan -> SetText(T_Timer).
+    // exact blueprint conversion from seconds as timespan settextttimer
     const FTimespan TimeSpan = FTimespan::FromSeconds(Seconds);
     T_Timer->SetText(FText::AsTimespan(TimeSpan));
     T_Timer->SetColorAndOpacity(FSlateColor(Seconds <= 30.0 ? FLinearColor(1.0f,0.28f,0.2f,1.0f) : FLinearColor(0.78f,0.91f,1.0f,1.0f)));

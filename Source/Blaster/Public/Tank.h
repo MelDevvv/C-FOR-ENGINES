@@ -101,11 +101,11 @@ protected:
    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tank|Abilities")
    TObjectPtr<UShieldComponent> ShieldComp;
 
-   // Visual-only shield bubble. Collision is disabled so it cannot affect gameplay.
+   // visualonly shield bubble collision is disabled so it cannot affect gameplay
    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tank|Abilities|Shield Visual")
    TObjectPtr<UStaticMeshComponent> ShieldBubble;
 
-   // Assign a translucent/emissive shield material in the Tank Blueprint.
+   // assign a translucentemissive shield material in the tank blueprint
    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Abilities|Shield Visual")
    TObjectPtr<UMaterialInterface> ShieldBubbleMaterial;
    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Weapons")
@@ -120,7 +120,7 @@ protected:
    float LightningBlastCooldown = 30.0f;
    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|Abilities|Lightning")
    TObjectPtr<UParticleSystem> LightningBlastEffect;
-   // Widget class loaded from WBP_MainUI.
+   // widget class loaded from wbpmainui
    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Tank|UI")
    TSubclassOf<UMainUIWidget> TankHUDClass;
 private:

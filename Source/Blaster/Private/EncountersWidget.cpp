@@ -13,8 +13,8 @@ void UEncountersWidget::NativeConstruct()
 
     CacheEncounterTextBlock();
 
-    // The original Event Construct gets the BP_EncounterManager actor and binds
-    // all three dispatchers. Retry until the manager exists in the world.
+    // the original event construct gets the bpencountermanager actor and binds
+    // all three dispatchers retry until the manager exists in the world
     FindAndBindEncounterManager();
 
     if (!IsValid(EncounterManager) && GetWorld())
@@ -51,8 +51,8 @@ void UEncountersWidget::NativeDestruct()
 
 void UEncountersWidget::CacheEncounterTextBlock()
 {
-    // T_Encounter is nested under ScaleBox_23 in the supplied Designer screenshot.
-    // GetWidgetFromName resolves the named child in the widget tree.
+    // tencounter is nested under scalebox23 in the supplied designer screenshot
+    // getwidgetfromname resolves the named child in the widget tree
     EncounterTextBlock = Cast<UTextBlock>(GetWidgetFromName(TEXT("T_Encounter")));
 
     if (!IsValid(EncounterTextBlock))
@@ -110,8 +110,8 @@ void UEncountersWidget::HandleEncounterStarted(int32 InTotalTargets)
     CacheEncounterTextBlock();
     UpdateEncounterText();
 
-    // IMPORTANT: The original Blueprint sets visibility on SELF (the whole
-    // WBP_Encounters widget), not only on the TextBlock.
+    // important the original blueprint sets visibility on self the whole
+    // wbpencounters widget not only on the textblock
     SetVisibility(ESlateVisibility::Visible);
 
     UE_LOG(LogTemp, Warning, TEXT("WBP_Encounters: Encounter started; showing %d/%d."),
@@ -123,7 +123,7 @@ void UEncountersWidget::HandleTargetCountUpdated(int32 InTargetCount)
     CurrentTargets = InTargetCount;
     UpdateEncounterText();
 
-    // Keep the whole widget visible while the encounter is active.
+    // keep the whole widget visible while the encounter is active
     SetVisibility(ESlateVisibility::Visible);
 }
 
@@ -136,8 +136,8 @@ void UEncountersWidget::HandleEncounterEnded()
         EncounterTextBlock->SetText(FText::FromString(TEXT("Encounter Completed!")));
     }
 
-    // Match the original graph: completion message, Delay 1.0, then
-    // SetVisibility(Collapsed) on SELF.
+    // match the original graph completion message delay 10 then
+    // setvisibilitycollapsed on self
     SetVisibility(ESlateVisibility::Visible);
 
     if (GetWorld())

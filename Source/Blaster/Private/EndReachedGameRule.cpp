@@ -6,10 +6,10 @@
 
 void UEndReachedGameRule::InitRule_Implementation(int32 InRuleID)
 {
-    // Preserve the parent rule initialization and RuleID setup.
+    // preserve the parent rule initialization and ruleid setup
     Super::InitRule_Implementation(InRuleID);
 
-    // Avoid duplicate bindings if InitRule is called again.
+    // avoid duplicate bindings if initrule is called again
     UnbindEndPoint();
 
     AActor* FoundEndPoint = FindBlueprintEndPoint();
@@ -44,7 +44,7 @@ AActor* UEndReachedGameRule::FindBlueprintEndPoint() const
         return nullptr;
     }
 
-    // Matches the original Blueprint GetActorOfClass(BP_EndPoint).
+    // matches the original blueprint getactorofclassbpendpoint
     for (TActorIterator<AActor> It(World); It; ++It)
     {
         AActor* Candidate = *It;
@@ -85,7 +85,7 @@ bool UEndReachedGameRule::BindEndPoint(AActor* EndPointActor)
         return false;
     }
 
-    // The Blueprint custom event OnEndReached has no input parameters.
+    // the blueprint custom event onendreached has no input parameters
     EndReachedDelegate.BindUFunction(
         this,
         GET_FUNCTION_NAME_CHECKED(UEndReachedGameRule, HandleEndReached)
@@ -137,7 +137,7 @@ void UEndReachedGameRule::HandleEndReached()
         RuleID
     );
 
-    // Matches the original Blueprint CompleteRule node with Successful = true.
+    // matches the original blueprint completerule node with successful true
     CompleteRule(true);
 }
 

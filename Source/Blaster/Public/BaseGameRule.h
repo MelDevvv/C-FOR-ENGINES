@@ -53,7 +53,7 @@ public:
     UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Rule")
     void UpdateRuleConditions();
 
-    // Timer controls used by the original BPC_TimerGameRule custom events.
+    // timer controls used by the original bpctimergamerule custom events
     UFUNCTION(BlueprintCallable, Category="Rule|Timer")
     void AddToTimer(float SecondsToAdd);
 
@@ -64,7 +64,7 @@ public:
     float GetTimerSecondsRemaining() const;
 
 protected:
-    // Shared with UEncounterGameRule, which inherits this manager reference.
+    // shared with uencountergamerule which inherits this manager reference
     UPROPERTY(Transient, BlueprintReadOnly, Category="Encounter Rule")
     TObjectPtr<AActor> EncounterManager = nullptr;
 
@@ -76,7 +76,7 @@ protected:
     void HandleEncounterCompletion(int32 CompletedRuleID, bool bSuccessful);
 
 private:
-    // Existing Encounter Rule native binding.
+    // existing encounter rule native binding
     bool IsEncounterRuleBlueprint() const;
     AActor* FindBlueprintEncounterManager() const;
     bool BindEncounterManager(AActor* Manager);
@@ -87,7 +87,7 @@ private:
     FMulticastDelegateProperty* EncounterCompletionProperty = nullptr;
     bool bEncounterCompletionBound = false;
 
-    // Timer is activated only for the existing BPC_TimerGameRule Blueprint child.
+    // timer is activated only for the existing bpctimergamerule blueprint child
     FTimerHandle NativeRuleTimerHandle;
     FTimerHandle NativeRuleTickHandle;
     bool bNativeTimerRule = false;

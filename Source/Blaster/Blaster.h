@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// fill out your copyright notice in the description page of project settings
 
 #pragma once
 

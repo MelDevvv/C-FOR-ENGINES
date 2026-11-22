@@ -78,8 +78,8 @@ void UHealthComponent::ResetHealth()
 
 void UHealthComponent::ActivateTarget()
 {
-    // The original target component listens for its owning actor being destroyed.
-    // AddUniqueDynamic makes this safe if the encounter manager activates it again.
+    // the original target component listens for its owning actor being destroyed
+    // adduniquedynamic makes this safe if the encounter manager activates it again
     if (AActor* OwnerActor = GetOwner())
     {
         OwnerActor->OnDestroyed.AddUniqueDynamic(this, &UHealthComponent::HandleOwnerDestroyed);

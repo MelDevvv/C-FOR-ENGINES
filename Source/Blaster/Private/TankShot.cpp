@@ -78,7 +78,7 @@ void ATankShot::OnSphereBeginOverlap(
    {
        return;
    }
-   // Ignore the tank that fired this projectile.
+   // ignore the tank that fired this projectile
    if (OtherActor == GetOwner() ||
        OtherActor == GetInstigator())
    {

@@ -14,8 +14,8 @@ void ACPPDoor::BeginPlay()
 {
     Super::BeginPlay();
 
-    // BP_Door's existing component is named Cube. Find it without replacing
-    // the Blueprint component or changing any placed-instance references.
+    // bpdoors existing component is named cube find it without replacing
+    // the blueprint component or changing any placedinstance references
     TArray<USceneComponent*> SceneComponents;
     GetComponents<USceneComponent>(SceneComponents);
     for (USceneComponent* Component : SceneComponents)
@@ -34,8 +34,8 @@ void ACPPDoor::BeginPlay()
 
     if (IsValid(DoorMeshComponent))
     {
-        // The original Blueprint BeginPlay stores Cube's initial world
-        // location in DoorClosed. Do the same natively.
+        // the original blueprint beginplay stores cubes initial world
+        // location in doorclosed do the same natively
         ClosedWorldLocation = DoorMeshComponent->GetComponentLocation();
         WriteBlueprintVector(TEXT("DoorClosed"), ClosedWorldLocation);
     }
@@ -62,7 +62,7 @@ void ACPPDoor::Tick(float DeltaSeconds)
         ? FMath::Clamp(MoveElapsed / MoveDuration, 0.0f, 1.0f)
         : 1.0f;
 
-    // T_Door is a 0-to-1 linear curve with a 0.5 second duration.
+    // tdoor is a 0to1 linear curve with a 05 second duration
     DoorMeshComponent->SetWorldLocation(FMath::Lerp(MoveStartLocation, MoveTargetLocation, Alpha));
 
     if (Alpha >= 1.0f)
@@ -73,7 +73,7 @@ void ACPPDoor::Tick(float DeltaSeconds)
 
 void ACPPDoor::Interact_Implementation(AActor* InteractorPawn)
 {
-    // Match the Blueprint Is Valid check: ignore a null/invalid interactor.
+    // match the blueprint is valid check ignore a nullinvalid interactor
     if (!IsValid(InteractorPawn) || !IsValid(DoorMeshComponent) || bIsMoving)
     {
         return;

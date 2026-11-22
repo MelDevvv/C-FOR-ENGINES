@@ -9,7 +9,7 @@ AEndPointActor::AEndPointActor()
 {
     PrimaryActorTick.bCanEverTick = false;
 
-    // Create endpoint trigger.
+    // create endpoint trigger
     Sphere = CreateDefaultSubobject<USphereComponent>(TEXT("Sphere"));
 
     SetRootComponent(Sphere);
@@ -24,7 +24,7 @@ AEndPointActor::AEndPointActor()
 
     Sphere->SetGenerateOverlapEvents(true);
 
-    // Create visual mesh.
+    // create visual mesh
     StaticMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
 
     StaticMesh->SetupAttachment(Sphere);
@@ -37,7 +37,7 @@ void AEndPointActor::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Recover references if necessary.
+    // recover references if necessary
     if (!IsValid(Sphere))
     {
         Sphere = FindComponentByClass<USphereComponent>();
@@ -48,7 +48,7 @@ void AEndPointActor::BeginPlay()
         StaticMesh = FindComponentByClass<UStaticMeshComponent>();
     }
 
-    // Do not continue if the trigger is missing.
+    // do not continue if the trigger is missing
     if (!IsValid(Sphere))
     {
         UE_LOG(
@@ -61,19 +61,19 @@ void AEndPointActor::BeginPlay()
         return;
     }
 
-    // Register overlap event.
+    // register overlap event
     Sphere->OnComponentBeginOverlap.AddUniqueDynamic(
         this,
         &AEndPointActor::HandleSphereBeginOverlap
     );
 
-    // Apply initial visibility.
+    // apply initial visibility
     if (IsValid(StaticMesh))
     {
         StaticMesh->SetVisibility(bAutoActivate, true);
     }
 
-    // Apply initial collision.
+    // apply initial collision
     Sphere->SetCollisionEnabled(
         bAutoActivate
             ? ECollisionEnabled::QueryOnly
@@ -83,7 +83,7 @@ void AEndPointActor::BeginPlay()
     bEndpointActivated = bAutoActivate;
     bEndReachedAlready = false;
 
-    // Notify listeners if automatically activated.
+    // notify listeners if automatically activated
     if (bAutoActivate)
     {
         EEndActivated.Broadcast();

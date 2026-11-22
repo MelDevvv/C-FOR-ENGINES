@@ -98,7 +98,7 @@ ATank::ATank()
    HealthComp = CreateDefaultSubobject<UHealthComponent>(TEXT("Health"));
    ShieldComp = CreateDefaultSubobject<UShieldComponent>(TEXT("Shield"));
 
-   // Visual-only shield bubble. No collision or overlap events.
+   // visualonly shield bubble no collision or overlap events
    ShieldBubble = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldBubble"));
    ShieldBubble->SetupAttachment(RootComponent);
    ShieldBubble->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -189,13 +189,13 @@ void ATank::CreateTankHUD()
    }
    if (HealthComp)
    {
-       // Send future health changes to the C++ widget.
+       // send future health changes to the c widget
        HealthComp->OnHealthModified.AddUniqueDynamic(
            TankHUD,
 &UMainUIWidget::UpdateHealthBar
        );
-       // ResetHealth() was called in BeginPlay, so the bar
-       // starts at full health.
+       // resethealth was called in beginplay so the bar
+       // starts at full health
        TankHUD->UpdateHealthBar(
            true,
            0.0f,
@@ -372,7 +372,7 @@ void ATank::ActivateLightningBlast()
         return;
     }
 
-    // Start cooldown immediately so repeated input cannot trigger multiple blasts.
+    // start cooldown immediately so repeated input cannot trigger multiple blasts
     LightningBlastCooldownRemaining = LightningBlastCooldown;
 
     if (LightningBlastEffect)
@@ -381,7 +381,7 @@ void ATank::ActivateLightningBlast()
             GetWorld(), LightningBlastEffect, GetActorLocation(), GetActorRotation(), FVector::OneVector, true);
     }
 
-    // Find nearby enemy turrets once and apply damage once per actor.
+    // find nearby enemy turrets once and apply damage once per actor
     TArray<AActor*> OverlappingActors;
     TArray<AActor*> ActorsToIgnore;
     ActorsToIgnore.Add(this);
@@ -414,7 +414,7 @@ void ATank::FireSecondaryRocket()
         return;
     }
 
-    // Use the existing tank gun's forward-facing muzzle as the launch point.
+    // use the existing tank guns forwardfacing muzzle as the launch point
     USceneComponent* LaunchComponent = W1 ? Cast<USceneComponent>(W1) : Cast<USceneComponent>(TCore01);
     if (!LaunchComponent) return;
 
@@ -430,7 +430,7 @@ void ATank::FireSecondaryRocket()
     ARocket* Rocket = GetWorld()->SpawnActor<ARocket>(SecondaryRocketClass, SpawnTransform, SpawnParams);
     if (!Rocket) return;
 
-    // Home towards the nearest enemy turret, matching the enemy rocket's homing behaviour.
+    // home towards the nearest enemy turret matching the enemy rockets homing behaviour
     TArray<AActor*> EnemyTurrets;
     UGameplayStatics::GetAllActorsOfClass(this, ABaseEnemyTurret::StaticClass(), EnemyTurrets);
     ABaseEnemyTurret* NearestTurret = nullptr;

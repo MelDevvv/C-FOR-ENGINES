@@ -18,7 +18,7 @@ public:
     AEncounterManagerActor();
     virtual void BeginPlay() override;
 
-    // Keep the original Blueprint property names/types for migration.
+    // keep the original blueprint property namestypes for migration
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category="Encounter")
     TArray<FEncounter> LevelEncounters;
 

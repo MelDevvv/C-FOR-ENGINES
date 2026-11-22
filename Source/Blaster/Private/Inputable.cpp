@@ -4,4 +4,4 @@
 #include "Inputable.h"
 
 
-// Add default functionality here for any IInputable functions that are not pure virtual.
+// add default functionality here for any iinputable functions that are not pure virtual

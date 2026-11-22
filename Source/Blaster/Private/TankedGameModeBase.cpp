@@ -126,7 +126,7 @@ void ATankedGameModeBase::OnRuleCompleted_Implementation(
         RuleID,
         bSuccessful ? TEXT("TRUE") : TEXT("FALSE"));
 
-    // Rule 0 is the timer. Failure means time has run out.
+    // rule 0 is the timer failure means time has run out
     if (RuleID == 0 && !bSuccessful)
     {
         UE_LOG(LogTemp, Warning, TEXT("TIMER EXPIRED - RESTARTING LEVEL"));
@@ -134,7 +134,7 @@ void ATankedGameModeBase::OnRuleCompleted_Implementation(
         return;
     }
 
-    // Rule 1 is the exit. Success means the player reached the exit.
+    // rule 1 is the exit success means the player reached the exit
     if (RuleID == 1 && bSuccessful)
     {
         UE_LOG(LogTemp, Warning, TEXT("EXIT REACHED - RESTARTING LEVEL"));
@@ -142,7 +142,7 @@ void ATankedGameModeBase::OnRuleCompleted_Implementation(
         return;
     }
 
-    // Encounter completion does not restart the level.
+    // encounter completion does not restart the level
     if (RuleID == 2 && bSuccessful)
     {
         UE_LOG(LogTemp, Warning, TEXT("ENCOUNTER RULE COMPLETED"));
@@ -198,7 +198,7 @@ void ATankedGameModeBase::CreateUIElementsForRules_Implementation()
 {
     if (IsValid(ObjectiveUIWidgetInstance))
     {
-        // Already on screen; do not duplicate the objective panel.
+        // already on screen do not duplicate the objective panel
         if (!ObjectiveUIWidgetInstance->IsInViewport())
         {
             ObjectiveUIWidgetInstance->AddToViewport(0);
@@ -225,8 +225,8 @@ void ATankedGameModeBase::CreateUIElementsForRules_Implementation()
         return;
     }
 
-    // The original Blueprint function pin is a generic Object Array.
-    // Convert ActiveRules to that exact input type before calling InitRulesCPP.
+    // the original blueprint function pin is a generic object array
+    // convert activerules to that exact input type before calling initrulescpp
     TArray<UObject*> RuleObjects;
     RuleObjects.Reserve(ActiveRules.Num());
 

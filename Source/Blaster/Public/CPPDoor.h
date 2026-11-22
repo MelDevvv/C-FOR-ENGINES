@@ -20,7 +20,7 @@ class BLASTER_API ACPPDoor : public AActor
 public:
     ACPPDoor();
 
-    // Must match the existing BPI_Interact function name and parameter.
+    // must match the existing bpiinteract function name and parameter
     UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Interaction")
     void Interact(AActor* InteractorPawn);
     virtual void Interact_Implementation(AActor* InteractorPawn);

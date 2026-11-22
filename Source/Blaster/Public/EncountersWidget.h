@@ -17,7 +17,7 @@ public:
     virtual void NativeDestruct() override;
 
 private:
-    // Finds the existing Designer TextBlock named T_Encounter.
+    // finds the existing designer textblock named tencounter
     UPROPERTY(Transient)
     TObjectPtr<UTextBlock> EncounterTextBlock = nullptr;
 

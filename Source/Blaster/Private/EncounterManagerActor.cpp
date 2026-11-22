@@ -21,9 +21,9 @@ void AEncounterManagerActor::BeginPlay()
 {
     Super::BeginPlay();
 
-    // The exported Blueprint had three trigger mappings (IDs 0, 1, 2), while
-    // the migrated struct entries can retain duplicate default IDs. Normalize
-    // entries by their encounter index only when duplicate IDs are detected.
+    // the exported blueprint had three trigger mappings ids 0 1 2 while
+    // the migrated struct entries can retain duplicate default ids normalize
+    // entries by their encounter index only when duplicate ids are detected
     TSet<int32> SeenIDs;
     bool bDuplicateIDs = false;
     for (const FEncounter& Entry : LevelEncounters)
@@ -115,9 +115,9 @@ void AEncounterManagerActor::DiscoverAndBuildEncounterActors()
             if (Existing.EncounterActors.Contains(Candidate)) { bAlreadyAssigned = true; break; }
         if (bAlreadyAssigned) continue;
 
-        // Assign by the enemy actor origin's distance to each encounter trigger actor.
-        // Do not use mesh/component bounds or volume overlap: large turrets can extend
-        // into neighbouring trigger boxes even though their actor pivot belongs to one area.
+        // assign by the enemy actor origins distance to each encounter trigger actor
+        // do not use meshcomponent bounds or volume overlap large turrets can extend
+        // into neighbouring trigger boxes even though their actor pivot belongs to one area
         AActor* ChosenTrigger = nullptr;
         int32 ChosenID = INDEX_NONE;
         double BestDistanceSq = TNumericLimits<double>::Max();
@@ -153,10 +153,10 @@ void AEncounterManagerActor::AutoAssignDoorEndInteractors()
 {
     if (!GetWorld()) return;
 
-    // Preserve all explicitly configured EndInteractors exactly as authored.
-    // For entries left empty, pair the two nearest BP_Door actors with that
-    // encounter. This reproduces the common paired-door setup and, unlike the
-    // previous implementation, does not stop after assigning only one door.
+    // preserve all explicitly configured endinteractors exactly as authored
+    // for entries left empty pair the two nearest bpdoor actors with that
+    // encounter this reproduces the common paireddoor setup and unlike the
+    // previous implementation does not stop after assigning only one door
     TSet<TObjectPtr<AActor>> AlreadyAssigned;
     for (const FEncounter& Encounter : LevelEncounters)
         for (AActor* Interactor : Encounter.EndInteractors)
@@ -246,7 +246,7 @@ void AEncounterManagerActor::ActivateEncounter(int32 EncounterID)
         BoundTargets.Add(Target);
         EnableTarget(Target);
 
-        // Match the original ActivateTarget call on BPC_TargetComponent.
+        // match the original activatetarget call on bpctargetcomponent
         TArray<UActorComponent*> Components;
         Target->GetComponents<UActorComponent>(Components);
         for (UActorComponent* Component : Components)
@@ -265,8 +265,8 @@ void AEncounterManagerActor::ActivateEncounter(int32 EncounterID)
     UpdateCount();
     EEncounterStarted.Broadcast(CurrentTargetCount);
     UE_LOG(LogTemp, Log, TEXT("Encounter %d started with %d targets"), EncounterID, CurrentTargetCount);
-    // Do not complete an empty encounter: the original Blueprint only completes
-    // through its target-destroyed event/count path.
+    // do not complete an empty encounter the original blueprint only completes
+    // through its targetdestroyed eventcount path
 }
 
 void AEncounterManagerActor::HandleTargetDestroyed(AActor* DestroyedActor)
@@ -353,7 +353,7 @@ void AEncounterManagerActor::ActivateFinalEndpoint()
         if (!ClassName.Contains(TEXT("EndPoint"), ESearchCase::IgnoreCase) &&
             !ActorName.Contains(TEXT("EndPoint"), ESearchCase::IgnoreCase)) continue;
 
-        // Prefer an explicit Blueprint activation function if the endpoint provides one.
+        // prefer an explicit blueprint activation function if the endpoint provides one
         static const FName ActivationFunctions[] = {
             FName(TEXT("ActivateEndPoint")), FName(TEXT("ActivateEndpoint")),
             FName(TEXT("EnableEndPoint")), FName(TEXT("EnableEndpoint")),
@@ -371,8 +371,8 @@ void AEncounterManagerActor::ActivateFinalEndpoint()
             }
         }
 
-        // BP_EndPoint's original BeginPlay hides/disables it when bAutoActivate is false.
-        // At final encounter completion, explicitly reveal it and restore overlap collision.
+        // bpendpoints original beginplay hidesdisables it when bautoactivate is false
+        // at final encounter completion explicitly reveal it and restore overlap collision
         Candidate->SetActorHiddenInGame(false);
         Candidate->SetActorEnableCollision(true);
         Candidate->SetActorTickEnabled(true);

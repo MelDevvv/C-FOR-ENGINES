@@ -36,7 +36,7 @@ AActor* UEncounterGameRule::FindBlueprintEncounterManager() const
         return nullptr;
     }
 
-    // Match the original Blueprint GetActorOfClass(BP_EncounterManager).
+    // match the original blueprint getactorofclassbpencountermanager
     for (TActorIterator<AActor> It(World); It; ++It)
     {
         AActor* Candidate = *It;
@@ -67,7 +67,7 @@ bool UEncounterGameRule::BindToManagerCompletion(AActor* Manager)
     FMulticastDelegateProperty* DelegateProperty =
         FindFProperty<FMulticastDelegateProperty>(Manager->GetClass(), TEXT("EEncountersCompleted"));
 
-    // Also support the native manager event name if the manager was converted separately.
+    // also support the native manager event name if the manager was converted separately
     if (!DelegateProperty)
     {
         DelegateProperty = FindFProperty<FMulticastDelegateProperty>(Manager->GetClass(), TEXT("OnNativeAllEncountersCompleted"));
@@ -114,7 +114,7 @@ void UEncounterGameRule::UnbindManagerCompletion()
 
 void UEncounterGameRule::HandleAllEncountersCompleted(int32 CompletedRuleID, bool bSuccessful)
 {
-    // Exact equivalent of the Blueprint's ERuleComplete.Broadcast(RuleID, Successful).
+    // exact equivalent of the blueprints erulecompletebroadcastruleid successful
     ERuleComplete.Broadcast(CompletedRuleID, bSuccessful);
     UE_LOG(LogTemp, Log, TEXT("EncounterGameRule: all encounters completed. ID=%d Success=%s"),
         CompletedRuleID, bSuccessful ? TEXT("true") : TEXT("false"));
